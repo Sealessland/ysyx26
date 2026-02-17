@@ -1,17 +1,17 @@
 /***************************************************************************************
-* Copyright (c) 2014-2024 Zihao Yu, Nanjing University
-*
-* NEMU is licensed under Mulan PSL v2.
-* You can use this software according to the terms and conditions of the Mulan PSL v2.
-* You may obtain a copy of Mulan PSL v2 at:
-*          http://license.coscl.org.cn/MulanPSL2
-*
-* THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
-* EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
-* MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
-*
-* See the Mulan PSL v2 for more details.
-***************************************************************************************/
+ * Copyright (c) 2014-2024 Zihao Yu, Nanjing University
+ *
+ * NEMU is licensed under Mulan PSL v2.
+ * You can use this software according to the terms and conditions of the Mulan
+ * PSL v2. You may obtain a copy of Mulan PSL v2 at:
+ *          http://license.coscl.org.cn/MulanPSL2
+ *
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+ * KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
+ *
+ * See the Mulan PSL v2 for more details.
+ ***************************************************************************************/
 
 #include <isa.h>
 
@@ -21,24 +21,32 @@
 #include <regex.h>
 
 enum {
-  TK_NOTYPE = 256, TK_EQ,
-
-  /* TODO: Add more token types */
-
+  TK_NOTYPE = 256,
+  TK_EQ,
+  TK_NEQ,
+  TK_AND,
+  TK_DEC,
+  TK_HEX,
+  TK_REG,
 };
 
 static struct rule {
   const char *regex;
   int token_type;
 } rules[] = {
-
-  /* TODO: Add more rules.
-   * Pay attention to the precedence level of different rules.
-   */
-
-  {" +", TK_NOTYPE},    // spaces
-  {"\\+", '+'},         // plus
-  {"==", TK_EQ},        // equal
+    {" +", TK_NOTYPE},           // spaces
+    {"\\+", '+'},                // plus
+    {"-", '-'},                  // minus
+    {"\\*", '*'},                // multiply
+    {"/", '/'},                  // divide
+    {"\\(", '('},                // left parenthesis
+    {"\\)", ')'},                // right parenthesis
+    {"==", TK_EQ},               // equal
+    {"!=", TK_NEQ},              // not equal
+    {"&&", TK_AND},              // logical and
+    {"0x[0-9a-fA-F]+", TK_HEX},  // hex number
+    {"[0-9]+", TK_DEC},          // decimal number
+    {"\\$[a-zA-Z0-9]+", TK_REG}, // register
 };
 
 #define NR_REGEX ARRLEN(rules)
@@ -53,7 +61,7 @@ void init_regex() {
   char error_msg[128];
   int ret;
 
-  for (i = 0; i < NR_REGEX; i ++) {
+  for (i = 0; i < NR_REGEX; i++) {
     ret = regcomp(&re[i], rules[i].regex, REG_EXTENDED);
     if (ret != 0) {
       regerror(ret, &re[i], error_msg, 128);
@@ -68,7 +76,7 @@ typedef struct token {
 } Token;
 
 static Token tokens[32] __attribute__((used)) = {};
-static int nr_token __attribute__((used))  = 0;
+static int nr_token __attribute__((used)) = 0;
 
 static bool make_token(char *e) {
   int position = 0;
@@ -79,13 +87,14 @@ static bool make_token(char *e) {
 
   while (e[position] != '\0') {
     /* Try all rules one by one. */
-    for (i = 0; i < NR_REGEX; i ++) {
-      if (regexec(&re[i], e + position, 1, &pmatch, 0) == 0 && pmatch.rm_so == 0) {
+    for (i = 0; i < NR_REGEX; i++) {
+      if (regexec(&re[i], e + position, 1, &pmatch, 0) == 0 &&
+          pmatch.rm_so == 0) {
         char *substr_start = e + position;
         int substr_len = pmatch.rm_eo;
 
-        Log("match rules[%d] = \"%s\" at position %d with len %d: %.*s",
-            i, rules[i].regex, position, substr_len, substr_len, substr_start);
+        Log("match rules[%d] = \"%s\" at position %d with len %d: %.*s", i,
+            rules[i].regex, position, substr_len, substr_len, substr_start);
 
         position += substr_len;
 
@@ -95,7 +104,21 @@ static bool make_token(char *e) {
          */
 
         switch (rules[i].token_type) {
-          default: TODO();
+        case TK_NOTYPE:
+          break;
+        case TK_DEC:
+        case TK_HEX:
+        case TK_REG:
+          if (substr_len >= 32) {
+            printf("Token too long\n");
+            return false;
+          }
+          strncpy(tokens[nr_token].str, substr_start, substr_len);
+          tokens[nr_token].str[substr_len] = '\0';
+        default:
+          tokens[nr_token].type = rules[i].token_type;
+          nr_token++;
+          break;
         }
 
         break;
@@ -111,6 +134,155 @@ static bool make_token(char *e) {
   return true;
 }
 
+static bool check_parentheses(int p, int q) {
+  if (tokens[p].type != '(' || tokens[q].type != ')') {
+    return false;
+  }
+  int b = 0;
+  for (int i = p + 1; i < q; i++) {
+    if (tokens[i].type == '(') {
+      b++;
+    } else if (tokens[i].type == ')') {
+      b--;
+    }
+    if (b < 0) {
+      return false;
+    }
+  }
+  return b == 0;
+}
+
+static int get_dominant_op(int p, int q) {
+  int op = -1;
+  int b = 0;
+  int prec = 0; // Current lowest precedence (higher value = lower precedence
+                // for comparison simplicity, or just use if-else chain)
+
+  // Custom precedence mapping (higher number = lower precedence to find the
+  // last occurrence) Let's use:
+  // && : 1
+  // ==, != : 2
+  // +, - : 3
+  // *, / : 4
+  // We want the operator with the SMALLEST precedence value (logically lowest
+  // binding) that appears LAST. Wait, standard convention: * is 4, + is 3. +
+  // has lower precedence. We want the operator with the LOWEST precedence
+  // level. If multiple have the same lowest precedence, we want the LAST one
+  // (left-associative).
+
+  for (int i = p; i <= q; i++) {
+    int type = tokens[i].type;
+    if (type == '(') {
+      b++;
+      continue;
+    }
+    if (type == ')') {
+      b--;
+      continue;
+    }
+    if (b != 0)
+      continue;
+
+    int current_prec = 99;
+    switch (type) {
+    case TK_AND:
+      current_prec = 1;
+      break;
+    case TK_EQ:
+    case TK_NEQ:
+      current_prec = 2;
+      break;
+    case '+':
+    case '-':
+      current_prec = 3;
+      break;
+    case '*':
+    case '/':
+      current_prec = 4;
+      break;
+    default:
+      continue; // Not an operator
+    }
+
+    // We want correct associativity.
+    // For left-associative (all of these), we update if current_prec <=
+    // op_prec. BUT we are looking for the 'main' operator, which is the one
+    // evaluated LAST. The one evaluated LAST is the one with LOWEST precedence.
+    // So if current_prec < op_prec (found a lower precedence op), take it.
+    // If current_prec == op_prec, take it (because it appears later, splits the
+    // expr: a + b + c -> (a+b) + c).
+
+    if (op == -1 || current_prec <= prec) {
+      op = i;
+      prec = current_prec;
+    }
+  }
+  return op;
+}
+
+static word_t eval(int p, int q, bool *success) {
+  if (p > q) {
+    *success = false;
+    return 0;
+  }
+  if (p == q) {
+    word_t val = 0;
+    switch (tokens[p].type) {
+    case TK_DEC:
+      val = strtoull(tokens[p].str, NULL, 10);
+      break;
+    case TK_HEX:
+      val = strtoull(tokens[p].str, NULL, 16);
+      break;
+    case TK_REG:
+      val = isa_reg_str2val(tokens[p].str + 1, success); // Skip '$'
+      break;
+    default:
+      *success = false;
+    }
+    return val;
+  }
+  if (check_parentheses(p, q)) {
+    return eval(p + 1, q - 1, success);
+  }
+
+  int op = get_dominant_op(p, q);
+  if (op == -1) {
+    *success = false;
+    return 0;
+  }
+
+  word_t val1 = eval(p, op - 1, success);
+  if (!*success)
+    return 0;
+  word_t val2 = eval(op + 1, q, success);
+  if (!*success)
+    return 0;
+
+  switch (tokens[op].type) {
+  case '+':
+    return val1 + val2;
+  case '-':
+    return val1 - val2;
+  case '*':
+    return val1 * val2;
+  case '/':
+    if (val2 == 0) {
+      *success = false;
+      return 0;
+    }
+    return val1 / val2;
+  case TK_EQ:
+    return val1 == val2;
+  case TK_NEQ:
+    return val1 != val2;
+  case TK_AND:
+    return val1 && val2;
+  default:
+    *success = false;
+    return 0;
+  }
+}
 
 word_t expr(char *e, bool *success) {
   if (!make_token(e)) {
@@ -118,8 +290,6 @@ word_t expr(char *e, bool *success) {
     return 0;
   }
 
-  /* TODO: Insert codes to evaluate the expression. */
-  TODO();
-
-  return 0;
+  *success = true;
+  return eval(0, nr_token - 1, success);
 }

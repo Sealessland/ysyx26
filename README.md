@@ -28,19 +28,22 @@ exit
 
 ### 核心文件
 
-- **[PERSISTENT_WORKING.md](PERSISTENT_WORKING.md)** - 🔑 持久化工作指南（推荐）
-- **[QUICKSTART.md](QUICKSTART.md)** - 🚀 快速上手指南
-- **[HOST_CONTAINER_GUIDE.md](HOST_CONTAINER_GUIDE.md)** - 📖 宿主机与容器切换完整教程
-- **[ENVIRONMENT_INFO.md](ENVIRONMENT_INFO.md)** - 📊 系统环境信息报告
+- **[docs/README.md](docs/README.md)** - 📚 文档中心（推荐从这里开始）
+- **[QUICKSTART.md](QUICKSTART.md)** - 🚀 3步快速开始
+- **[docs/HOW_TO_SAVE.md](docs/HOW_TO_SAVE.md)** - 💾 保存修改完整指南
 
 ### 常用命令
 
 ```bash
-./enter.sh            # 进入容器（推荐）
-exit                  # 退出容器
-./save.sh             # 保存容器修改
-podman ps -a          # 查看容器状态
-podman stop ysyx-dev  # 停止容器
+# 标准工作流（推荐）
+./enter.sh            # 进入容器
+cd nemu && make run   # 编译运行
+exit                 # 退出（自动保存代码）
+./save.sh            # 保存配置
+
+# 神奇操作（重要节点）
+./save-and-enter.sh   # 保存后进入
+./enter-smart.sh     # 智能提示版
 ```
 
 ### 容器特性
@@ -50,17 +53,17 @@ podman stop ysyx-dev  # 停止容器
 - ✅ 预装所有编译工具
 - ✅ NEMU 已编译可运行
 - ✅ 配置清华镜像源
+- ✅ 智能保存提示（新）
 
-### sudo 使用
+### 更多脚本
 
 ```bash
-./enter.sh
-sudo apt update     # 更新软件包
-sudo apt install xxx # 安装软件
-sudo whoami         # 验证权限
+./enter-smart.sh     # 智能提示版（超过1小时提示保存）
+./save-and-enter.sh   # 保存后进入（重要节点）
+./container-setup.sh # 容器环境优化
 ```
 
-详细信息请查看 [PERSISTENT_WORKING.md](PERSISTENT_WORKING.md)
+详细文档请查看 **[docs/README.md](docs/README.md)**
 
 ---
 
