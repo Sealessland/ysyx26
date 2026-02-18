@@ -87,8 +87,6 @@ void list_watchpoints() {
   for (WP *wp = head; wp != NULL; wp = wp->next) {
     printf("%-2d      watchpoint     keep y                    %s\n", wp->NO,
            wp->expr);
-    // Note: Address/Enb/Disp are mockups to match GDB generic style, or just
-    // keep it simple
   }
 }
 
