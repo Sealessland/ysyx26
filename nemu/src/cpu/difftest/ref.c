@@ -13,43 +13,37 @@
 * See the Mulan PSL v2 for more details.
 ***************************************************************************************/
 
+#include "isa-def.h"
 #include <isa.h>
 #include <cpu/cpu.h>
 #include <difftest-def.h>
 #include <memory/paddr.h>
-#define NR_GPR MUXDEF(CONFIG_RVE, 16, 32)
-
-struct diff_context_t {
-  word_t gpr[NR_GPR];
-  word_t pc;
-};
+#define NR_GPR MUXDEF(CONFIG_RVE, 16, 32) 
 __EXPORT void difftest_memcpy(paddr_t addr, void *buf, size_t n, bool direction) {
-  void *nemu_buf = (void *)guest_to_host(addr);
-  if(direction == DIFFTEST_TO_REF)  //dut -> ref (buf -> addr(nemu_buf))
-    memcpy(nemu_buf , buf , n);
-  else                              //ref -> dut (addr(nemu_buf) -> buf)
-    memcpy(buf , nemu_buf, n);
+	if(direction == DIFFTEST_TO_REF)
+		memcpy(guest_to_host(addr), buf, n);
+	else
+		memcpy(buf, guest_to_host(addr), n);
 }
 
 __EXPORT void difftest_regcpy(void *dut, bool direction) {
-  int i = 0;
-  struct diff_context_t *dut_state = (struct diff_context_t *)dut;
-  if(direction == DIFFTEST_TO_REF){
-    for(i = 0;i < NR_GPR ; i++){
-      cpu.gpr[i] = dut_state -> gpr[i];
-    }
-  }
-  else{
-    for(i = 0;i < NR_GPR ; i++){
-      dut_state -> gpr[i] = cpu.gpr[i];
-      dut_state -> pc = cpu.pc;
-    }
-  }
-
+	CPU_state *npc_dut = (CPU_state *)dut;
+	if(direction == DIFFTEST_TO_REF) 
+	{
+		for(int i = 0; i < NR_GPR; i++)
+			cpu.gpr[i] = npc_dut->gpr[i];
+		cpu.pc = npc_dut->pc;
+	}
+	else
+	{
+		for(int i = 0; i < NR_GPR; i++)
+			npc_dut->gpr[i] = cpu.gpr[i];
+		npc_dut->pc = cpu.pc;
+	}
 }
 
 __EXPORT void difftest_exec(uint64_t n) {
-  cpu_exec(n);
+	cpu_exec(n);
 }
 
 __EXPORT void difftest_raise_intr(word_t NO) {
