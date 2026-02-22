@@ -1,7 +1,8 @@
+import sCore.CoreTop
+import sCore.utils.CoreConfig
+
 object Elaborate extends App {
   val firtoolOptions = Array(
-    "--default-layer-specialization=enable",
-    "--verification-flavor=immediate",
     "--lowering-options=" + List(
       // make yosys happy
       // see https://github.com/llvm/circt/blob/main/docs/VerilogGeneration.md
@@ -10,5 +11,9 @@ object Elaborate extends App {
       "locationInfoStyle=wrapInAtSquareBracket"
     ).reduce(_ + "," + _)
   )
-  circt.stage.ChiselStage.emitSystemVerilogFile(new gcd.GCD(), args, firtoolOptions)
+
+  implicit val config: CoreConfig = CoreConfig(isSingleCycle = true)
+
+  // 2. 生成主要模块的Verilog代码
+  circt.stage.ChiselStage.emitSystemVerilogFile(new CoreTop(), args, firtoolOptions)
 }

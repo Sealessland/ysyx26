@@ -38,12 +38,6 @@
 #define ANSI_BG_WHITE   "\33[1;47m"
 #define ANSI_NONE       "\33[0m"
 
-const char *regs_names[] = {
-  "$0", "ra", "sp", "gp", "tp", "t0", "t1", "t2",
-  "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5",
-  "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7",
-  "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6"
-};
 
 bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
   bool flag = true;
@@ -67,7 +61,7 @@ bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
       flag = false;
       reg_mismatch[i] = true;
       printf("%sGPR[%s] mismatch: ref=0x%x, dut=0x%x%s\n", 
-             ANSI_FG_RED, regs_names[i], ref_r->gpr[i], cpu.gpr[i], ANSI_NONE);
+             ANSI_FG_RED, reg_name(i), ref_r->gpr[i], cpu.gpr[i], ANSI_NONE);
     }
   }
   
@@ -90,10 +84,10 @@ bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
     for(i = 0; i < REGNUM; i++) {
       if(reg_mismatch[i]) {
         printf("%s%3s: ref=0x%08x dut=0x%08x%s  ", 
-               ANSI_BG_RED, regs_names[i], ref_r->gpr[i], cpu.gpr[i], ANSI_NONE);
+               ANSI_BG_RED, reg_name(i), ref_r->gpr[i], cpu.gpr[i], ANSI_NONE);
       } else {
         printf("%s%3s: ref=0x%08x dut=0x%08x%s  ", 
-               ANSI_FG_GREEN, regs_names[i], ref_r->gpr[i], cpu.gpr[i], ANSI_NONE);
+               ANSI_FG_GREEN, reg_name(i), ref_r->gpr[i], cpu.gpr[i], ANSI_NONE);
       }
       
       if((i + 1) % 3 == 0) printf("\n");
