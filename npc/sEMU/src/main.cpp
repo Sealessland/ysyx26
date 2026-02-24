@@ -100,6 +100,11 @@ int main(int argc, char* argv[]) {
     else {
         std::cout << "No initialization image specified. Booting with a hardcoded test sequence..." << std::endl;
         mem.mem_init();
+#ifdef CONFIG_DIFFTEST
+        // Sync the hardcoded test sequence to REF
+        // Note: We need to sync after mem_init() but before difftest.init()
+        // For now, we'll sync after difftest.init() in the next section
+#endif
     }
 
     // 初始化处理器核心，并传入内存指针以供 DPI-C 操作
@@ -113,9 +118,13 @@ int main(int argc, char* argv[]) {
 #define DIFFTEST_REF_PATH "/home/sealessland/ysyx-workbench/nemu/build/riscv32-nemu-interpreter-so"
 #endif
     difftest.init(DIFFTEST_REF_PATH, 0);
-    // Note: If using elf_loader, we currently didn't sync ELF segments in main. 
-    // It's cleaner to sync memory in the ELF loader itself or sync the whole PMEM. 
-    // Here we sync registers:
+
+    // Always sync memory to REF after loading any image
+    // This ensures DUT and REF start with the same memory contents
+    size_t sync_size = 128 * 1024 * 1024;  // Sync entire 128MB memory
+    difftest.sync_memory(0x80000000, mem.get_host_ptr(0x80000000), sync_size, true);
+
+    // Sync registers to REF
     difftest.sync_registers(&core, true);
 #endif
 

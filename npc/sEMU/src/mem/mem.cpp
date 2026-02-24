@@ -126,6 +126,11 @@ void guest_mem::mem_init(){
     // j     0
     
     const uint32_t hardcoded_insts[] = {
+          0x00000297,  // auipc t0,0
+  0x00028823,  // sb  zero,16(t0)
+  0x0102c503,  // lbu a0,16(t0)
+  0x00100073,  // ebreak (used as nemu_trap)
+  0xdeadbeef,  // some data
         0xa0000537, // lui   a0, 0xa0000
         0x3f850513, // addi  a0, a0, 0x3f8
         0x06400593, // addi  a1, x0, 100 ('d')

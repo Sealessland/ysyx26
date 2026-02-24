@@ -104,10 +104,9 @@ void SDB::cmd_si(const std::vector<std::string>& args) {
         CPU_state dut_state_to_check;
 
         run_simulation(sim_range, [&](const CoreCommitState& state) {
-            // If we have a pending check and a new instruction is committing,
-            // the previous instruction's writeback is complete, so we can check now
-            if (check_pending && state.is_commit_valid()) {
-                // Get the updated DUT registers after writeback
+            // If we have a pending check, do it now (PC and registers should be updated)
+            if (check_pending) {
+                // Get the updated DUT state
                 for (int i = 0; i < 32; ++i) {
                     dut_state_to_check.gpr[i] = state.get_core()->get_reg(i);
                 }
@@ -120,32 +119,52 @@ void SDB::cmd_si(const std::vector<std::string>& args) {
                 check_pending = false;
             }
 
-            // When DUT commits an instruction, step REF and schedule a check
+            // When DUT commits an instruction
             if (state.is_commit_valid() && !check_pending && state.get_core()->state == CoreState::RUNNING) {
                 // Step REF by 1 instruction
                 difftest.step(1);
 
-                // Save the PC that just committed for the next check
-                dut_state_to_check.pc = state.get_commit_pc();
+                // Build DUT state using commit signals for register writeback
+                for (int i = 0; i < 32; ++i) {
+                    dut_state_to_check.gpr[i] = state.get_core()->get_reg(i);
+                }
 
-                // Schedule check on next commit (when writeback is complete)
+                // If this instruction writes to a register, update it with the commit data
+                if (state.get_core()->is_commit_wen()) {
+                    uint8_t rd = state.get_core()->get_commit_rd();
+                    uint32_t wdata = state.get_core()->get_commit_wdata();
+                    if (rd != 0) {  // x0 is always 0
+                        dut_state_to_check.gpr[rd] = wdata;
+                    }
+                }
+
+                // PC will be checked in the next cycle after it updates
+                // Schedule check on next cycle
                 check_pending = true;
 
                 // Count commits
                 if (++commit_count >= steps) {
-                    const_cast<Core*>(state.get_core())->state = CoreState::STOPPED;
+                    // Don't stop immediately, let the PC update
                 }
+            }
+
+            // Stop after we've committed and checked all instructions
+            if (commit_count >= steps && !check_pending) {
+                const_cast<Core*>(state.get_core())->state = CoreState::STOPPED;
             }
         });
 
         // If we finished with a pending check, do one final check
         if (check_pending) {
-            // Read final DUT state
-            for (int i = 0; i < 32; ++i) {
-                dut_state_to_check.gpr[i] = core->get_reg(i);
-            }
-            dut_state_to_check.pc = core->get_reg_by_name("pc");
-            difftest.check_registers(dut_state_to_check);
+            // Step the simulation one more time to let PC update
+            run_simulation(sim_range, [&](const CoreCommitState& state) {
+                for (int i = 0; i < 32; ++i) {
+                    dut_state_to_check.gpr[i] = state.get_core()->get_reg(i);
+                }
+                dut_state_to_check.pc = state.get_core()->get_reg_by_name("pc");
+                difftest.check_registers(dut_state_to_check);
+                const_cast<Core*>(state.get_core())->state = CoreState::STOPPED;
+            });
         }
 #else
         run_simulation(sim_range, [&](const CoreCommitState& state) {
