@@ -2,6 +2,7 @@ package sCore
 
 import chisel3._
 import chisel3.util._
+import chisel3.probe._
 import sCore.utils._
 
 // 这是一个专门用于生成单模块验证的 Top
@@ -15,6 +16,7 @@ class CoreTop()(implicit p: CoreConfig) extends Module {
     val commit_rd    = Output(UInt(5.W))
     val commit_wdata = Output(UInt(p.xlen.W))
     val commit_wen   = Output(Bool())
+    
   })
 
   // ================= 1. 实例化核心组件 =================
@@ -106,7 +108,20 @@ class CoreTop()(implicit p: CoreConfig) extends Module {
   // ================= 4. 测试与观察层投射 =================
   io.commit_pc    := wbu.io.wb_pc
   io.commit_valid := wbu.io.wb_valid
+  
   io.commit_rd    := wbu.io.rf_waddr
   io.commit_wdata := wbu.io.rf_wdata
   io.commit_wen   := wbu.io.rf_wen
+  if (p.hasZicsr) {
+    // 仅在参数化开启时，在顶层动态附加生成用于 DPI/Verilator 监控的探针端口
+    val probe_csr_waddr = IO(Output(Probe(UInt(12.W))))
+    val probe_csr_wdata = IO(Output(Probe(UInt(p.xlen.W))))
+    val probe_csr_wen   = IO(Output(Probe(Bool())))
+    val probe_csr_op    = IO(Output(Probe(CsrOp())))
+
+    define(probe_csr_waddr, ProbeValue(wbu.io.csr_waddr))
+    define(probe_csr_wdata, ProbeValue(wbu.io.csr_wdata))
+    define(probe_csr_wen,   ProbeValue(wbu.io.csr_wen))
+    define(probe_csr_op,    ProbeValue(wbu.io.csr_op))
+  }
 }

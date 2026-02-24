@@ -8,6 +8,9 @@
 #include "sEMU/core.hpp"
 #include "sEMU/sdb.hpp"
 #include "sEMU/utils/elf_loader.hpp"
+#ifdef CONFIG_DIFFTEST
+#include "sEMU/difftest.hpp"
+#endif
 
 struct sEMU_Options {
     std::string bin_file;
@@ -31,13 +34,23 @@ sEMU_Options parse_args(int argc, char* argv[]) {
             case 'b': opt.bin_file = optarg; break;
             case 'e': opt.elf_file = optarg; break;
             case 'h':
-                std::cout << "Usage: " << argv[0] << " [options]\n"
+                std::cout << "Usage: " << argv[0] << " [options] [image.bin]\n"
                           << "Options:\n"
                           << "  -b, --bin <file>   Load binary image.\n"
                           << "  -e, --elf <file>   Load ELF image and parse symbols.\n"
                           << "  -h, --help         Show this help message.\n";
                 exit(0);
-            case 1: break;
+            case 1: 
+                if (opt.bin_file.empty() && opt.elf_file.empty()) {
+                    // Try to guess by extension or just default to bin
+                    std::string arg = optarg;
+                    if (arg.length() > 4 && arg.substr(arg.length() - 4) == ".elf") {
+                        opt.elf_file = arg;
+                    } else {
+                        opt.bin_file = arg; 
+                    }
+                }
+                break;
             default:
                 std::cerr << "Unknown argument! Try --help for more information.\n";
                 exit(1);
@@ -77,6 +90,9 @@ int main(int argc, char* argv[]) {
         std::vector<char> buffer(size);
         if (file.read(buffer.data(), size)) {
             mem.load_binary(0x80000000, buffer.data(), size);
+#ifdef CONFIG_DIFFTEST
+            difftest.sync_memory(0x80000000, buffer.data(), size, true);
+#endif
             std::cout << "Successfully loaded " << size << " bytes into memory." << std::endl;
         }
     } 
@@ -91,6 +107,17 @@ int main(int argc, char* argv[]) {
 
     // 进行简单的系统复位
     core.reset(5);
+
+#ifdef CONFIG_DIFFTEST
+#ifndef DIFFTEST_REF_PATH
+#define DIFFTEST_REF_PATH "/home/sealessland/ysyx-workbench/nemu/build/riscv32-nemu-interpreter-so"
+#endif
+    difftest.init(DIFFTEST_REF_PATH, 0);
+    // Note: If using elf_loader, we currently didn't sync ELF segments in main. 
+    // It's cleaner to sync memory in the ELF loader itself or sync the whole PMEM. 
+    // Here we sync registers:
+    difftest.sync_registers(&core, true);
+#endif
 
     SDB sdb(&core, &mem, has_loader ? &elf_loader : nullptr);
     sdb.sdb_mainloop();

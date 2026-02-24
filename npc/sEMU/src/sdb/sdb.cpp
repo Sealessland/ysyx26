@@ -3,6 +3,9 @@
 #include "sEMU/mem.hpp"
 #include "sEMU/wrapper.hpp"
 #include "sEMU/utils/elf_loader.hpp"
+#ifdef CONFIG_DIFFTEST
+#include "sEMU/difftest.hpp"
+#endif
 #include <iostream>
 #include <sstream>
 #include <iomanip>
@@ -94,14 +97,62 @@ void SDB::cmd_si(const std::vector<std::string>& args) {
         g_trace_mem = false;
     } 
     else if (mode == "diff") {
-        g_trace_mem = false; // 按需是否开启，或者在这里独立执行Difftest
+        g_trace_mem = false;
+#ifdef CONFIG_DIFFTEST
+        int commit_count = 0;
+        bool check_pending = false;
+        CPU_state dut_state_to_check;
+
         run_simulation(sim_range, [&](const CoreCommitState& state) {
-            check_limit();
-            // ============================================
-            // 以后在这里添加对 ref (如 Spike/NEMU) 的接口操作
-            // 例如： difftest_exec(1); 分步对比 gpr 和 pc
-            // ============================================
+            // If we have a pending check and a new instruction is committing,
+            // the previous instruction's writeback is complete, so we can check now
+            if (check_pending && state.is_commit_valid()) {
+                // Get the updated DUT registers after writeback
+                for (int i = 0; i < 32; ++i) {
+                    dut_state_to_check.gpr[i] = state.get_core()->get_reg(i);
+                }
+                dut_state_to_check.pc = state.get_core()->get_reg_by_name("pc");
+
+                // Check if DUT and REF match
+                if (!difftest.check_registers(dut_state_to_check)) {
+                    const_cast<Core*>(state.get_core())->state = CoreState::STOPPED;
+                }
+                check_pending = false;
+            }
+
+            // When DUT commits an instruction, step REF and schedule a check
+            if (state.is_commit_valid() && !check_pending && state.get_core()->state == CoreState::RUNNING) {
+                // Step REF by 1 instruction
+                difftest.step(1);
+
+                // Save the PC that just committed for the next check
+                dut_state_to_check.pc = state.get_commit_pc();
+
+                // Schedule check on next commit (when writeback is complete)
+                check_pending = true;
+
+                // Count commits
+                if (++commit_count >= steps) {
+                    const_cast<Core*>(state.get_core())->state = CoreState::STOPPED;
+                }
+            }
         });
+
+        // If we finished with a pending check, do one final check
+        if (check_pending) {
+            // Read final DUT state
+            for (int i = 0; i < 32; ++i) {
+                dut_state_to_check.gpr[i] = core->get_reg(i);
+            }
+            dut_state_to_check.pc = core->get_reg_by_name("pc");
+            difftest.check_registers(dut_state_to_check);
+        }
+#else
+        run_simulation(sim_range, [&](const CoreCommitState& state) {
+            std::cout << "[Difftest] Disabled during compilation (CONFIG_DIFFTEST not defined).\n";
+            const_cast<Core*>(state.get_core())->state = CoreState::STOPPED;
+        });
+#endif
     }
     else {
         std::cout << "Unknown mode: " << mode << ". Please use 'bare', 'trace', or 'diff'.\n";
@@ -125,6 +176,19 @@ void SDB::cmd_info(const std::vector<std::string>& args) {
         core->print_registers();
     } else if (args[0] == "w") {
         std::cout << "Watchpoint info not implemented yet." << std::endl;
+    } else if (args[0] == "func") {
+        if (args.size() < 2) {
+            std::cout << "Missing function name (Usage: info func <name>)" << std::endl;
+        } else if (!elf_loader) {
+            std::cout << "No ELF loaded. Cannot resolve symbols." << std::endl;
+        } else {
+            uint32_t addr = elf_loader->get_symbol_addr(args[1]);
+            if (addr != 0) {
+                std::cout << "Function '" << args[1] << "' is at address: 0x" << std::hex << addr << std::dec << std::endl;
+            } else {
+                std::cout << "Function '" << args[1] << "' not found in symbol table." << std::endl;
+            }
+        }
     } else {
         std::cout << "Unknown info sub-command: " << args[0] << std::endl;
     }
@@ -263,7 +327,7 @@ void SDB::cmd_help(const std::vector<std::string>& args) {
               << "q - Quit NEMU\n"
               << "si [N] [mode] - Single step N instructions with optional mode ['bare', 'trace', 'diff'] (default: bare)\n"
               << "trace-func FUNC_NAME - Auto trace when entering and exiting specific function\n"
-              << "info SUBCMD - info r (registers), info w (watchpoints)\n"
+              << "info SUBCMD - info r (registers), info w (watchpoints), info func FUNC_NAME (get function address)\n"
               << "x N EXPR - Examine memory\n";
 }
 

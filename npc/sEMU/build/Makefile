@@ -113,6 +113,7 @@ preinstall/fast:
 
 # clear depends
 depend:
+	$(CMAKE_COMMAND) -P /home/sealessland/ysyx-workbench/npc/sEMU/build/CMakeFiles/VerifyGlobs.cmake
 	$(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 1
 .PHONY : depend
 
@@ -128,6 +129,342 @@ sEMU: cmake_check_build_system
 sEMU/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/build
 .PHONY : sEMU/fast
+
+dut/verilator/VCoreTop.o: dut/verilator/VCoreTop.cpp.o
+.PHONY : dut/verilator/VCoreTop.o
+
+# target to build an object file
+dut/verilator/VCoreTop.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop.cpp.o
+.PHONY : dut/verilator/VCoreTop.cpp.o
+
+dut/verilator/VCoreTop.i: dut/verilator/VCoreTop.cpp.i
+.PHONY : dut/verilator/VCoreTop.i
+
+# target to preprocess a source file
+dut/verilator/VCoreTop.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop.cpp.i
+.PHONY : dut/verilator/VCoreTop.cpp.i
+
+dut/verilator/VCoreTop.s: dut/verilator/VCoreTop.cpp.s
+.PHONY : dut/verilator/VCoreTop.s
+
+# target to generate assembly for a file
+dut/verilator/VCoreTop.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop.cpp.s
+.PHONY : dut/verilator/VCoreTop.cpp.s
+
+dut/verilator/VCoreTop__Dpi.o: dut/verilator/VCoreTop__Dpi.cpp.o
+.PHONY : dut/verilator/VCoreTop__Dpi.o
+
+# target to build an object file
+dut/verilator/VCoreTop__Dpi.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop__Dpi.cpp.o
+.PHONY : dut/verilator/VCoreTop__Dpi.cpp.o
+
+dut/verilator/VCoreTop__Dpi.i: dut/verilator/VCoreTop__Dpi.cpp.i
+.PHONY : dut/verilator/VCoreTop__Dpi.i
+
+# target to preprocess a source file
+dut/verilator/VCoreTop__Dpi.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop__Dpi.cpp.i
+.PHONY : dut/verilator/VCoreTop__Dpi.cpp.i
+
+dut/verilator/VCoreTop__Dpi.s: dut/verilator/VCoreTop__Dpi.cpp.s
+.PHONY : dut/verilator/VCoreTop__Dpi.s
+
+# target to generate assembly for a file
+dut/verilator/VCoreTop__Dpi.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop__Dpi.cpp.s
+.PHONY : dut/verilator/VCoreTop__Dpi.cpp.s
+
+dut/verilator/VCoreTop__Syms.o: dut/verilator/VCoreTop__Syms.cpp.o
+.PHONY : dut/verilator/VCoreTop__Syms.o
+
+# target to build an object file
+dut/verilator/VCoreTop__Syms.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop__Syms.cpp.o
+.PHONY : dut/verilator/VCoreTop__Syms.cpp.o
+
+dut/verilator/VCoreTop__Syms.i: dut/verilator/VCoreTop__Syms.cpp.i
+.PHONY : dut/verilator/VCoreTop__Syms.i
+
+# target to preprocess a source file
+dut/verilator/VCoreTop__Syms.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop__Syms.cpp.i
+.PHONY : dut/verilator/VCoreTop__Syms.cpp.i
+
+dut/verilator/VCoreTop__Syms.s: dut/verilator/VCoreTop__Syms.cpp.s
+.PHONY : dut/verilator/VCoreTop__Syms.s
+
+# target to generate assembly for a file
+dut/verilator/VCoreTop__Syms.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop__Syms.cpp.s
+.PHONY : dut/verilator/VCoreTop__Syms.cpp.s
+
+dut/verilator/VCoreTop__TraceDecls__0__Slow.o: dut/verilator/VCoreTop__TraceDecls__0__Slow.cpp.o
+.PHONY : dut/verilator/VCoreTop__TraceDecls__0__Slow.o
+
+# target to build an object file
+dut/verilator/VCoreTop__TraceDecls__0__Slow.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop__TraceDecls__0__Slow.cpp.o
+.PHONY : dut/verilator/VCoreTop__TraceDecls__0__Slow.cpp.o
+
+dut/verilator/VCoreTop__TraceDecls__0__Slow.i: dut/verilator/VCoreTop__TraceDecls__0__Slow.cpp.i
+.PHONY : dut/verilator/VCoreTop__TraceDecls__0__Slow.i
+
+# target to preprocess a source file
+dut/verilator/VCoreTop__TraceDecls__0__Slow.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop__TraceDecls__0__Slow.cpp.i
+.PHONY : dut/verilator/VCoreTop__TraceDecls__0__Slow.cpp.i
+
+dut/verilator/VCoreTop__TraceDecls__0__Slow.s: dut/verilator/VCoreTop__TraceDecls__0__Slow.cpp.s
+.PHONY : dut/verilator/VCoreTop__TraceDecls__0__Slow.s
+
+# target to generate assembly for a file
+dut/verilator/VCoreTop__TraceDecls__0__Slow.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop__TraceDecls__0__Slow.cpp.s
+.PHONY : dut/verilator/VCoreTop__TraceDecls__0__Slow.cpp.s
+
+dut/verilator/VCoreTop__Trace__0.o: dut/verilator/VCoreTop__Trace__0.cpp.o
+.PHONY : dut/verilator/VCoreTop__Trace__0.o
+
+# target to build an object file
+dut/verilator/VCoreTop__Trace__0.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop__Trace__0.cpp.o
+.PHONY : dut/verilator/VCoreTop__Trace__0.cpp.o
+
+dut/verilator/VCoreTop__Trace__0.i: dut/verilator/VCoreTop__Trace__0.cpp.i
+.PHONY : dut/verilator/VCoreTop__Trace__0.i
+
+# target to preprocess a source file
+dut/verilator/VCoreTop__Trace__0.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop__Trace__0.cpp.i
+.PHONY : dut/verilator/VCoreTop__Trace__0.cpp.i
+
+dut/verilator/VCoreTop__Trace__0.s: dut/verilator/VCoreTop__Trace__0.cpp.s
+.PHONY : dut/verilator/VCoreTop__Trace__0.s
+
+# target to generate assembly for a file
+dut/verilator/VCoreTop__Trace__0.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop__Trace__0.cpp.s
+.PHONY : dut/verilator/VCoreTop__Trace__0.cpp.s
+
+dut/verilator/VCoreTop__Trace__0__Slow.o: dut/verilator/VCoreTop__Trace__0__Slow.cpp.o
+.PHONY : dut/verilator/VCoreTop__Trace__0__Slow.o
+
+# target to build an object file
+dut/verilator/VCoreTop__Trace__0__Slow.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop__Trace__0__Slow.cpp.o
+.PHONY : dut/verilator/VCoreTop__Trace__0__Slow.cpp.o
+
+dut/verilator/VCoreTop__Trace__0__Slow.i: dut/verilator/VCoreTop__Trace__0__Slow.cpp.i
+.PHONY : dut/verilator/VCoreTop__Trace__0__Slow.i
+
+# target to preprocess a source file
+dut/verilator/VCoreTop__Trace__0__Slow.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop__Trace__0__Slow.cpp.i
+.PHONY : dut/verilator/VCoreTop__Trace__0__Slow.cpp.i
+
+dut/verilator/VCoreTop__Trace__0__Slow.s: dut/verilator/VCoreTop__Trace__0__Slow.cpp.s
+.PHONY : dut/verilator/VCoreTop__Trace__0__Slow.s
+
+# target to generate assembly for a file
+dut/verilator/VCoreTop__Trace__0__Slow.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop__Trace__0__Slow.cpp.s
+.PHONY : dut/verilator/VCoreTop__Trace__0__Slow.cpp.s
+
+dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.o: dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.cpp.o
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.o
+
+# target to build an object file
+dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.cpp.o
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.cpp.o
+
+dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.i: dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.cpp.i
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.i
+
+# target to preprocess a source file
+dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.cpp.i
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.cpp.i
+
+dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.s: dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.cpp.s
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.s
+
+# target to generate assembly for a file
+dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.cpp.s
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.cpp.s
+
+dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.o: dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.cpp.o
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.o
+
+# target to build an object file
+dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.cpp.o
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.cpp.o
+
+dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.i: dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.cpp.i
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.i
+
+# target to preprocess a source file
+dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.cpp.i
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.cpp.i
+
+dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.s: dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.cpp.s
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.s
+
+# target to generate assembly for a file
+dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.cpp.s
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.cpp.s
+
+dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.o: dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.cpp.o
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.o
+
+# target to build an object file
+dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.cpp.o
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.cpp.o
+
+dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.i: dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.cpp.i
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.i
+
+# target to preprocess a source file
+dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.cpp.i
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.cpp.i
+
+dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.s: dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.cpp.s
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.s
+
+# target to generate assembly for a file
+dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.cpp.s
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.cpp.s
+
+dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.o: dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.cpp.o
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.o
+
+# target to build an object file
+dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.cpp.o
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.cpp.o
+
+dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.i: dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.cpp.i
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.i
+
+# target to preprocess a source file
+dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.cpp.i
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.cpp.i
+
+dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.s: dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.cpp.s
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.s
+
+# target to generate assembly for a file
+dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.cpp.s
+.PHONY : dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.cpp.s
+
+dut/verilator/VCoreTop___024root__Slow.o: dut/verilator/VCoreTop___024root__Slow.cpp.o
+.PHONY : dut/verilator/VCoreTop___024root__Slow.o
+
+# target to build an object file
+dut/verilator/VCoreTop___024root__Slow.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024root__Slow.cpp.o
+.PHONY : dut/verilator/VCoreTop___024root__Slow.cpp.o
+
+dut/verilator/VCoreTop___024root__Slow.i: dut/verilator/VCoreTop___024root__Slow.cpp.i
+.PHONY : dut/verilator/VCoreTop___024root__Slow.i
+
+# target to preprocess a source file
+dut/verilator/VCoreTop___024root__Slow.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024root__Slow.cpp.i
+.PHONY : dut/verilator/VCoreTop___024root__Slow.cpp.i
+
+dut/verilator/VCoreTop___024root__Slow.s: dut/verilator/VCoreTop___024root__Slow.cpp.s
+.PHONY : dut/verilator/VCoreTop___024root__Slow.s
+
+# target to generate assembly for a file
+dut/verilator/VCoreTop___024root__Slow.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024root__Slow.cpp.s
+.PHONY : dut/verilator/VCoreTop___024root__Slow.cpp.s
+
+dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.o: dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.cpp.o
+.PHONY : dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.o
+
+# target to build an object file
+dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.cpp.o
+.PHONY : dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.cpp.o
+
+dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.i: dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.cpp.i
+.PHONY : dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.i
+
+# target to preprocess a source file
+dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.cpp.i
+.PHONY : dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.cpp.i
+
+dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.s: dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.cpp.s
+.PHONY : dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.s
+
+# target to generate assembly for a file
+dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.cpp.s
+.PHONY : dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.cpp.s
+
+dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.o: dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.cpp.o
+.PHONY : dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.o
+
+# target to build an object file
+dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.cpp.o
+.PHONY : dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.cpp.o
+
+dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.i: dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.cpp.i
+.PHONY : dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.i
+
+# target to preprocess a source file
+dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.cpp.i
+.PHONY : dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.cpp.i
+
+dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.s: dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.cpp.s
+.PHONY : dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.s
+
+# target to generate assembly for a file
+dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.cpp.s
+.PHONY : dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.cpp.s
+
+dut/verilator/VCoreTop___024unit__Slow.o: dut/verilator/VCoreTop___024unit__Slow.cpp.o
+.PHONY : dut/verilator/VCoreTop___024unit__Slow.o
+
+# target to build an object file
+dut/verilator/VCoreTop___024unit__Slow.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024unit__Slow.cpp.o
+.PHONY : dut/verilator/VCoreTop___024unit__Slow.cpp.o
+
+dut/verilator/VCoreTop___024unit__Slow.i: dut/verilator/VCoreTop___024unit__Slow.cpp.i
+.PHONY : dut/verilator/VCoreTop___024unit__Slow.i
+
+# target to preprocess a source file
+dut/verilator/VCoreTop___024unit__Slow.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024unit__Slow.cpp.i
+.PHONY : dut/verilator/VCoreTop___024unit__Slow.cpp.i
+
+dut/verilator/VCoreTop___024unit__Slow.s: dut/verilator/VCoreTop___024unit__Slow.cpp.s
+.PHONY : dut/verilator/VCoreTop___024unit__Slow.s
+
+# target to generate assembly for a file
+dut/verilator/VCoreTop___024unit__Slow.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/dut/verilator/VCoreTop___024unit__Slow.cpp.s
+.PHONY : dut/verilator/VCoreTop___024unit__Slow.cpp.s
 
 src/iterator/wrapper.o: src/iterator/wrapper.cpp.o
 .PHONY : src/iterator/wrapper.o
@@ -249,6 +586,30 @@ src/top/core.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/src/top/core.cpp.s
 .PHONY : src/top/core.cpp.s
 
+src/utils/difftest.o: src/utils/difftest.cpp.o
+.PHONY : src/utils/difftest.o
+
+# target to build an object file
+src/utils/difftest.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/src/utils/difftest.cpp.o
+.PHONY : src/utils/difftest.cpp.o
+
+src/utils/difftest.i: src/utils/difftest.cpp.i
+.PHONY : src/utils/difftest.i
+
+# target to preprocess a source file
+src/utils/difftest.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/src/utils/difftest.cpp.i
+.PHONY : src/utils/difftest.cpp.i
+
+src/utils/difftest.s: src/utils/difftest.cpp.s
+.PHONY : src/utils/difftest.s
+
+# target to generate assembly for a file
+src/utils/difftest.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/src/utils/difftest.cpp.s
+.PHONY : src/utils/difftest.cpp.s
+
 src/utils/elf_loader.o: src/utils/elf_loader.cpp.o
 .PHONY : src/utils/elf_loader.o
 
@@ -273,6 +634,102 @@ src/utils/elf_loader.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/src/utils/elf_loader.cpp.s
 .PHONY : src/utils/elf_loader.cpp.s
 
+usr/share/verilator/include/verilated.o: usr/share/verilator/include/verilated.cpp.o
+.PHONY : usr/share/verilator/include/verilated.o
+
+# target to build an object file
+usr/share/verilator/include/verilated.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/usr/share/verilator/include/verilated.cpp.o
+.PHONY : usr/share/verilator/include/verilated.cpp.o
+
+usr/share/verilator/include/verilated.i: usr/share/verilator/include/verilated.cpp.i
+.PHONY : usr/share/verilator/include/verilated.i
+
+# target to preprocess a source file
+usr/share/verilator/include/verilated.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/usr/share/verilator/include/verilated.cpp.i
+.PHONY : usr/share/verilator/include/verilated.cpp.i
+
+usr/share/verilator/include/verilated.s: usr/share/verilator/include/verilated.cpp.s
+.PHONY : usr/share/verilator/include/verilated.s
+
+# target to generate assembly for a file
+usr/share/verilator/include/verilated.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/usr/share/verilator/include/verilated.cpp.s
+.PHONY : usr/share/verilator/include/verilated.cpp.s
+
+usr/share/verilator/include/verilated_dpi.o: usr/share/verilator/include/verilated_dpi.cpp.o
+.PHONY : usr/share/verilator/include/verilated_dpi.o
+
+# target to build an object file
+usr/share/verilator/include/verilated_dpi.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/usr/share/verilator/include/verilated_dpi.cpp.o
+.PHONY : usr/share/verilator/include/verilated_dpi.cpp.o
+
+usr/share/verilator/include/verilated_dpi.i: usr/share/verilator/include/verilated_dpi.cpp.i
+.PHONY : usr/share/verilator/include/verilated_dpi.i
+
+# target to preprocess a source file
+usr/share/verilator/include/verilated_dpi.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/usr/share/verilator/include/verilated_dpi.cpp.i
+.PHONY : usr/share/verilator/include/verilated_dpi.cpp.i
+
+usr/share/verilator/include/verilated_dpi.s: usr/share/verilator/include/verilated_dpi.cpp.s
+.PHONY : usr/share/verilator/include/verilated_dpi.s
+
+# target to generate assembly for a file
+usr/share/verilator/include/verilated_dpi.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/usr/share/verilator/include/verilated_dpi.cpp.s
+.PHONY : usr/share/verilator/include/verilated_dpi.cpp.s
+
+usr/share/verilator/include/verilated_threads.o: usr/share/verilator/include/verilated_threads.cpp.o
+.PHONY : usr/share/verilator/include/verilated_threads.o
+
+# target to build an object file
+usr/share/verilator/include/verilated_threads.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/usr/share/verilator/include/verilated_threads.cpp.o
+.PHONY : usr/share/verilator/include/verilated_threads.cpp.o
+
+usr/share/verilator/include/verilated_threads.i: usr/share/verilator/include/verilated_threads.cpp.i
+.PHONY : usr/share/verilator/include/verilated_threads.i
+
+# target to preprocess a source file
+usr/share/verilator/include/verilated_threads.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/usr/share/verilator/include/verilated_threads.cpp.i
+.PHONY : usr/share/verilator/include/verilated_threads.cpp.i
+
+usr/share/verilator/include/verilated_threads.s: usr/share/verilator/include/verilated_threads.cpp.s
+.PHONY : usr/share/verilator/include/verilated_threads.s
+
+# target to generate assembly for a file
+usr/share/verilator/include/verilated_threads.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/usr/share/verilator/include/verilated_threads.cpp.s
+.PHONY : usr/share/verilator/include/verilated_threads.cpp.s
+
+usr/share/verilator/include/verilated_vcd_c.o: usr/share/verilator/include/verilated_vcd_c.cpp.o
+.PHONY : usr/share/verilator/include/verilated_vcd_c.o
+
+# target to build an object file
+usr/share/verilator/include/verilated_vcd_c.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/usr/share/verilator/include/verilated_vcd_c.cpp.o
+.PHONY : usr/share/verilator/include/verilated_vcd_c.cpp.o
+
+usr/share/verilator/include/verilated_vcd_c.i: usr/share/verilator/include/verilated_vcd_c.cpp.i
+.PHONY : usr/share/verilator/include/verilated_vcd_c.i
+
+# target to preprocess a source file
+usr/share/verilator/include/verilated_vcd_c.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/usr/share/verilator/include/verilated_vcd_c.cpp.i
+.PHONY : usr/share/verilator/include/verilated_vcd_c.cpp.i
+
+usr/share/verilator/include/verilated_vcd_c.s: usr/share/verilator/include/verilated_vcd_c.cpp.s
+.PHONY : usr/share/verilator/include/verilated_vcd_c.s
+
+# target to generate assembly for a file
+usr/share/verilator/include/verilated_vcd_c.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/sEMU.dir/build.make CMakeFiles/sEMU.dir/usr/share/verilator/include/verilated_vcd_c.cpp.s
+.PHONY : usr/share/verilator/include/verilated_vcd_c.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -282,6 +739,48 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... sEMU"
+	@echo "... dut/verilator/VCoreTop.o"
+	@echo "... dut/verilator/VCoreTop.i"
+	@echo "... dut/verilator/VCoreTop.s"
+	@echo "... dut/verilator/VCoreTop__Dpi.o"
+	@echo "... dut/verilator/VCoreTop__Dpi.i"
+	@echo "... dut/verilator/VCoreTop__Dpi.s"
+	@echo "... dut/verilator/VCoreTop__Syms.o"
+	@echo "... dut/verilator/VCoreTop__Syms.i"
+	@echo "... dut/verilator/VCoreTop__Syms.s"
+	@echo "... dut/verilator/VCoreTop__TraceDecls__0__Slow.o"
+	@echo "... dut/verilator/VCoreTop__TraceDecls__0__Slow.i"
+	@echo "... dut/verilator/VCoreTop__TraceDecls__0__Slow.s"
+	@echo "... dut/verilator/VCoreTop__Trace__0.o"
+	@echo "... dut/verilator/VCoreTop__Trace__0.i"
+	@echo "... dut/verilator/VCoreTop__Trace__0.s"
+	@echo "... dut/verilator/VCoreTop__Trace__0__Slow.o"
+	@echo "... dut/verilator/VCoreTop__Trace__0__Slow.i"
+	@echo "... dut/verilator/VCoreTop__Trace__0__Slow.s"
+	@echo "... dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.o"
+	@echo "... dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.i"
+	@echo "... dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0.s"
+	@echo "... dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.o"
+	@echo "... dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.i"
+	@echo "... dut/verilator/VCoreTop___024root__DepSet_h7f65a1f5__0__Slow.s"
+	@echo "... dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.o"
+	@echo "... dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.i"
+	@echo "... dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0.s"
+	@echo "... dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.o"
+	@echo "... dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.i"
+	@echo "... dut/verilator/VCoreTop___024root__DepSet_h8f2c8a57__0__Slow.s"
+	@echo "... dut/verilator/VCoreTop___024root__Slow.o"
+	@echo "... dut/verilator/VCoreTop___024root__Slow.i"
+	@echo "... dut/verilator/VCoreTop___024root__Slow.s"
+	@echo "... dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.o"
+	@echo "... dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.i"
+	@echo "... dut/verilator/VCoreTop___024unit__DepSet_h7b210d6e__0.s"
+	@echo "... dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.o"
+	@echo "... dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.i"
+	@echo "... dut/verilator/VCoreTop___024unit__DepSet_h92f026be__0__Slow.s"
+	@echo "... dut/verilator/VCoreTop___024unit__Slow.o"
+	@echo "... dut/verilator/VCoreTop___024unit__Slow.i"
+	@echo "... dut/verilator/VCoreTop___024unit__Slow.s"
 	@echo "... src/iterator/wrapper.o"
 	@echo "... src/iterator/wrapper.i"
 	@echo "... src/iterator/wrapper.s"
@@ -297,9 +796,24 @@ help:
 	@echo "... src/top/core.o"
 	@echo "... src/top/core.i"
 	@echo "... src/top/core.s"
+	@echo "... src/utils/difftest.o"
+	@echo "... src/utils/difftest.i"
+	@echo "... src/utils/difftest.s"
 	@echo "... src/utils/elf_loader.o"
 	@echo "... src/utils/elf_loader.i"
 	@echo "... src/utils/elf_loader.s"
+	@echo "... usr/share/verilator/include/verilated.o"
+	@echo "... usr/share/verilator/include/verilated.i"
+	@echo "... usr/share/verilator/include/verilated.s"
+	@echo "... usr/share/verilator/include/verilated_dpi.o"
+	@echo "... usr/share/verilator/include/verilated_dpi.i"
+	@echo "... usr/share/verilator/include/verilated_dpi.s"
+	@echo "... usr/share/verilator/include/verilated_threads.o"
+	@echo "... usr/share/verilator/include/verilated_threads.i"
+	@echo "... usr/share/verilator/include/verilated_threads.s"
+	@echo "... usr/share/verilator/include/verilated_vcd_c.o"
+	@echo "... usr/share/verilator/include/verilated_vcd_c.i"
+	@echo "... usr/share/verilator/include/verilated_vcd_c.s"
 .PHONY : help
 
 
@@ -311,6 +825,7 @@ help:
 # No rule that depends on this can have commands that come from listfiles
 # because they might be regenerated.
 cmake_check_build_system:
+	$(CMAKE_COMMAND) -P /home/sealessland/ysyx-workbench/npc/sEMU/build/CMakeFiles/VerifyGlobs.cmake
 	$(CMAKE_COMMAND) -S$(CMAKE_SOURCE_DIR) -B$(CMAKE_BINARY_DIR) --check-build-system CMakeFiles/Makefile.cmake 0
 .PHONY : cmake_check_build_system
 

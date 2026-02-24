@@ -17,22 +17,32 @@ Core* p_core = nullptr;
 bool g_trace_mem = false;
 std::vector<std::string> mem_access_log;
 
+// 用 volatile 计数器产生可见副作用，防止编译器把 npc_ebreak 整体优化消除
+static volatile int g_ebreak_count = 0;
+
 extern "C" {
     void npc_ebreak() {
-        std::cout << "EBREAK executing, stopping simulation!" << std::endl;
+        // 写入 volatile 变量：编译器无法证明此写无副作用，必须保留
+        g_ebreak_count++;
+        // 全编译器内存屏障：禁止跨此点做任何内存访问重排或 dead-store 消除
+        asm volatile("" ::: "memory");
+
+        std::cout << "EBREAK executing, stopping simulation! (count=" 
+                  << g_ebreak_count << ")" << std::endl;
         if (p_core) {
             p_core->state = CoreState::END;
+            // 再做一次写后屏障，确保 state 赋值对其他线程/eval 上下文可见
+            asm volatile("" ::: "memory");
         }
     }
 
     bool in_bounds(size_t addr) {
         if (!p_mem) return false;
-        // 假设 base 默认为 0x80000000，size 默认为 128MB
-        // 这里为了简单，我们可以使用粗略的范围检查
-        return (addr >= 0x80000000 && addr < 0x80000000 + 128 * 1024 * 1024);
+        return p_mem->in_bounds(addr);
     }
 
     int paddr_read(int io_raddr) {
+        //trans into hex
         size_t addr = static_cast<size_t>(io_raddr) & 0xFFFFFFFF;
         if (in_bounds(addr)) {
             return p_mem->lw(addr);
@@ -166,4 +176,9 @@ uint32_t Core::get_reg_by_name(const std::string& name) const {
     }
     std::cerr << "Unknown register: " << name << std::endl;
     return 0;
+}
+
+uint32_t Core::get_reg(int idx) const {
+    if (idx < 0 || idx >= 32) return 0;
+    return top->rootp->CoreTop__DOT__regfile__DOT__regs_ext__DOT__Memory[idx];
 }

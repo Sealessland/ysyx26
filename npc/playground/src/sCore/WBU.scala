@@ -41,7 +41,9 @@ class WBU()(implicit p: CoreConfig) extends CoreModule {
   
   // 决定最终要写什么进通用寄存器
   // CSR 指令同时也需要向通用整数寄存器中写入旧的 CSR 值
-  val enableIntRegWrite = inValid && (inData.wbTarget === WbTarget.INT_REG || inData.wbTarget === WbTarget.CSR_REG) 
+  // RISC-V 规范：x0 寄存器硬连线为 0，不能写入任何值，因此强行抑制 rdaddr == 0 的写使能
+  val enableIntRegWrite = inValid && (inData.rdaddr =/= 0.U(5.W)) && 
+                          (inData.wbTarget === WbTarget.INT_REG || inData.wbTarget === WbTarget.CSR_REG) 
 
   io.rf_waddr := inData.rdaddr
   io.rf_wdata := inData.rfData

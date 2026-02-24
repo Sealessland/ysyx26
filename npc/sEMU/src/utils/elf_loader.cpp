@@ -5,6 +5,9 @@
 #include <vector>
 #include <cstring>
 #include <elf.h>
+#ifdef CONFIG_DIFFTEST
+#include "sEMU/difftest.hpp"
+#endif
 
 bool ElfLoader::load(const std::string& path, guest_mem& mem) {
     std::ifstream file(path, std::ios::binary | std::ios::ate);
@@ -34,6 +37,9 @@ bool ElfLoader::load(const std::string& path, guest_mem& mem) {
     for (int i = 0; i < ehdr->e_phnum; ++i) {
         if (phdr[i].p_type == PT_LOAD && phdr[i].p_memsz > 0) {
             mem.load_binary(phdr[i].p_paddr, buf.data() + phdr[i].p_offset, phdr[i].p_filesz);
+#ifdef CONFIG_DIFFTEST
+            difftest.sync_memory(phdr[i].p_paddr, buf.data() + phdr[i].p_offset, phdr[i].p_filesz, true);
+#endif
             // 这里暂且不处理 .bss 段（p_memsz > p_filesz 的全 0 部分），假设 mem 已清零
         }
     }

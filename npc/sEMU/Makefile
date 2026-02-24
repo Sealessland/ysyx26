@@ -9,6 +9,12 @@ RUN_ARGS ?=
 # C++附加编译参数
 CXX_FLAGS ?=
 
+ifeq ($(DIFFTEST), 1)
+CMAKE_ARGS += -DCMAKE_CXX_FLAGS="-DCONFIG_DIFFTEST"
+else ifeq ($(DIFFTEST), 2)
+# If user passes extra path, support it if needed, but above defaults are fine
+endif
+
 # 声明伪目标
 .PHONY: all build run clean docs serve-docs clean-docs
 
@@ -18,16 +24,23 @@ all: build
 # 配置并编译
 build:
 	@mkdir -p $(BUILD_DIR)
+	@echo "--- 正在使用 CMake 构建 sEMU，并开启详细日志以观测 DPI-C 编译与链接细节 ---"
 	@cd $(BUILD_DIR) && cmake -DCMAKE_BUILD_TYPE=$(BUILD_TYPE) \
 		-DCMAKE_CXX_FLAGS="$(CXX_FLAGS)" \
 		$(CMAKE_ARGS) ..
-	@$(MAKE) -C $(BUILD_DIR)
+	@$(MAKE) VERBOSE=1 -C $(BUILD_DIR)
 	@cp -f $(BUILD_DIR)/compile_commands.json . 2>/dev/null || true
 
 # 运行程序
 run: build
 	@echo "--- 正在运行 sEMU [$(BUILD_TYPE)] ---"
+ifdef bin
+	@./$(BUILD_DIR)/sEMU $(RUN_ARGS) $(bin)
+else ifdef elf
+	@./$(BUILD_DIR)/sEMU $(RUN_ARGS) -e $(elf)
+else
 	@./$(BUILD_DIR)/sEMU $(RUN_ARGS)
+endif
 
 # 定制文档和第三方依赖目录
 DOC_DIR ?= html
