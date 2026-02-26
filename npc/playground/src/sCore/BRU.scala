@@ -70,6 +70,14 @@ class BRU()(implicit p: CoreConfig) extends CoreModule {
       // JALR 把低位置 0
       jumpTarget := (in1 + io.imm) & (~1.U(xlen.W))
     }
+    is(BruOp.ECALL) {
+      isJump := true.B
+      jumpTarget := in1 // ECALL 时由于配置 rs1 为 csr_val(MTVEC)，此处直接跳
+    }
+    is(BruOp.MRET) {
+      isJump := true.B
+      jumpTarget := in1 // MRET 时由于配置 rs1 为 csr_val(MEPC)，此处直接跳
+    }
   }
 
   // 目前是不带预测的 Base 版本：判断是否需要重定向直接根据 isJump 输出

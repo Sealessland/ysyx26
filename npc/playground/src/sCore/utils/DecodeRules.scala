@@ -9,11 +9,12 @@ import org.chipsalliance.rvdecoderdb
 // 全局解码相关枚举定义 (正交多维架构)
 //======================================================================
 object FUType extends ChiselEnum { val ALU, BRU, LSU, MDU, CSR, FPU, NONE = Value }
-object Src1Sel extends ChiselEnum { val RS1, PC, ZERO, UIMM = Value }
+object Src1Sel extends ChiselEnum { val RS1, PC, ZERO, UIMM, CSR_VAL = Value }
 object Src2Sel extends ChiselEnum { val RS2, IMM, FOUR = Value }
 object AluOp extends ChiselEnum { val ADD, SUB, AND, OR, XOR, SLL, SRL, SRA, SLT, SLTU, CPY = Value }
-object BruOp extends ChiselEnum { val NONE, BEQ, BNE, BLT, BGE, BLTU, BGEU, JAL, JALR = Value }
-object CsrOp extends ChiselEnum { val NONE, RW, RS, RC, SYS = Value }
+object BruOp extends ChiselEnum { val NONE, BEQ, BNE, BLT, BGE, BLTU, BGEU, JAL, JALR, ECALL, MRET = Value }
+object CsrOp extends ChiselEnum { val NONE, RW, RS, RC, SYS, ECALL, MRET = Value }
+object MduOp extends ChiselEnum { val NONE, MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU = Value }
 object MemCmd extends ChiselEnum { val NONE, READ, WRITE, AMO = Value }
 object MemSize extends ChiselEnum { val B, H, W, D = Value }
 object WbTarget extends ChiselEnum { val NONE, INT_REG, FP_REG, CSR_REG = Value }
@@ -69,6 +70,7 @@ object DecodeRules {
       case "auipc" | "jal" | "jalr" => Src1Sel.PC
       case "lui" => Src1Sel.ZERO
       case "csrrwi" | "csrrsi" | "csrrci" => Src1Sel.UIMM
+      case "ecall" | "mret" => Src1Sel.CSR_VAL
       case _ => Src1Sel.RS1
     }
   }
@@ -109,6 +111,8 @@ object DecodeRules {
       case "bgeu" => BruOp.BGEU
       case "jal"  => BruOp.JAL
       case "jalr" => BruOp.JALR
+      case "ecall" => BruOp.ECALL
+      case "mret"  => BruOp.MRET
       case _ => BruOp.NONE
     }
   }
@@ -118,7 +122,9 @@ object DecodeRules {
       case "csrrw" | "csrrwi" => CsrOp.RW
       case "csrrs" | "csrrsi" => CsrOp.RS
       case "csrrc" | "csrrci" => CsrOp.RC
-      case "ecall" | "ebreak" | "mret" | "sret" | "wfi" => CsrOp.SYS
+      case "ecall" => CsrOp.ECALL
+      case "mret"  => CsrOp.MRET
+      case "ebreak" | "sret" | "wfi" => CsrOp.SYS
       case _ => CsrOp.NONE
     }
   }
@@ -170,12 +176,27 @@ object DecodeRules {
     else if (args.contains("jimm20"))      ImmTypeEnum.immJ
     else if (args.contains("shamtd"))      ImmTypeEnum.immShamtD
     else if (args.contains("shamtw"))      ImmTypeEnum.immShamtW
+    else if (args.contains("shamt"))       ImmTypeEnum.immShamtW // RV32 uses shamt as 5-bit
     else if (args.contains("zimm5"))       ImmTypeEnum.immZ
     else                                   ImmTypeEnum.immNone
   }
 
+  val MduOpExp = enumField("mduOp", MduOp) { i =>
+    i.name match {
+      case "mul" | "mulw"       => MduOp.MUL
+      case "mulh"               => MduOp.MULH
+      case "mulhsu"             => MduOp.MULHSU
+      case "mulhu"              => MduOp.MULHU
+      case "div" | "divw"       => MduOp.DIV
+      case "divu" | "divuw"     => MduOp.DIVU
+      case "rem" | "remw"       => MduOp.REM
+      case "remu" | "remuw"     => MduOp.REMU
+      case _ => MduOp.NONE
+    }
+  }
+
   val allFields = Seq(
-    FuTypeExp, Src1Exp, Src2Exp, AluOpExp, BruOpExp, CsrOpExp,
+    FuTypeExp, Src1Exp, Src2Exp, AluOpExp, BruOpExp, CsrOpExp, MduOpExp,
     MemCmdExp, MemSizeExp, MemSignExp, WbTargetExp, ImmTypeExp
   )
 }

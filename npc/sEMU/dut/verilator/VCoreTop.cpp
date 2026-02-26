@@ -13,10 +13,16 @@ VCoreTop::VCoreTop(VerilatedContext* _vcontextp__, const char* _vcname__)
     , clock{vlSymsp->TOP.clock}
     , reset{vlSymsp->TOP.reset}
     , io_commit_valid{vlSymsp->TOP.io_commit_valid}
+    , io_commit_is_store{vlSymsp->TOP.io_commit_is_store}
+    , io_commit_halt{vlSymsp->TOP.io_commit_halt}
     , io_commit_rd{vlSymsp->TOP.io_commit_rd}
     , io_commit_wen{vlSymsp->TOP.io_commit_wen}
+    , io_commit_csr_wen{vlSymsp->TOP.io_commit_csr_wen}
+    , io_commit_csr_waddr{vlSymsp->TOP.io_commit_csr_waddr}
     , io_commit_pc{vlSymsp->TOP.io_commit_pc}
+    , io_commit_inst{vlSymsp->TOP.io_commit_inst}
     , io_commit_wdata{vlSymsp->TOP.io_commit_wdata}
+    , io_commit_csr_wdata{vlSymsp->TOP.io_commit_csr_wdata}
     , __PVT____024unit{vlSymsp->TOP.__PVT____024unit}
     , rootp{&(vlSymsp->TOP)}
 {

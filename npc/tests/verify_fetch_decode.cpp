@@ -13,13 +13,16 @@
 namespace {
 constexpr uint32_t kBase = 0x80000000u;
 constexpr uint32_t kDataBase = 0x80001000u;
-constexpr size_t kMemSize = 1 << 16; // 64KB
+constexpr size_t kDefaultMemSize = 64 * 1024 * 1024; // 64MB
+constexpr size_t kSelfTestMemSize = 1 << 16; // 64KB
+constexpr size_t kDefaultMaxCycles = 200000;
+constexpr const char *kDefaultBinPath = "build/build/rtthread-riscv32e-npc.bin";
 constexpr uint32_t kCsrMstatus = 0x300;
 constexpr uint32_t kCsrMtvec = 0x305;
 constexpr uint32_t kCsrMepc = 0x341;
 constexpr uint32_t kCsrMcause = 0x342;
 
-std::vector<uint8_t> g_mem(kMemSize, 0);
+std::vector<uint8_t> g_mem(kDefaultMemSize, 0);
 bool g_ebreak_called = false;
 
 inline bool addr_in_range(uint32_t addr) {
@@ -51,6 +54,135 @@ inline void mem_write(uint32_t addr, uint64_t data, uint8_t len) {
 inline int32_t sign_extend(uint32_t val, int bits) {
   uint32_t m = 1u << (bits - 1);
   return static_cast<int32_t>((val ^ m) - m);
+}
+
+const char *decode_mnemonic(uint32_t inst) {
+  uint32_t opcode = inst & 0x7f;
+  uint32_t rd = (inst >> 7) & 0x1f;
+  uint32_t funct3 = (inst >> 12) & 0x7;
+  uint32_t rs1 = (inst >> 15) & 0x1f;
+  uint32_t rs2 = (inst >> 20) & 0x1f;
+  uint32_t funct7 = (inst >> 25) & 0x7f;
+
+  (void)rd;
+  (void)rs1;
+  (void)rs2;
+
+  switch (opcode) {
+  case 0x37: return "lui";
+  case 0x17: return "auipc";
+  case 0x6f: return "jal";
+  case 0x67: return "jalr";
+  case 0x63:
+    switch (funct3) {
+    case 0x0: return "beq";
+    case 0x1: return "bne";
+    case 0x4: return "blt";
+    case 0x5: return "bge";
+    case 0x6: return "bltu";
+    case 0x7: return "bgeu";
+    default: return "branch";
+    }
+  case 0x03:
+    switch (funct3) {
+    case 0x0: return "lb";
+    case 0x1: return "lh";
+    case 0x2: return "lw";
+    case 0x4: return "lbu";
+    case 0x5: return "lhu";
+    default: return "load";
+    }
+  case 0x23:
+    switch (funct3) {
+    case 0x0: return "sb";
+    case 0x1: return "sh";
+    case 0x2: return "sw";
+    default: return "store";
+    }
+  case 0x13:
+    switch (funct3) {
+    case 0x0: return "addi";
+    case 0x2: return "slti";
+    case 0x3: return "sltiu";
+    case 0x4: return "xori";
+    case 0x6: return "ori";
+    case 0x7: return "andi";
+    case 0x1: return "slli";
+    case 0x5: return ((inst >> 25) == 0x20) ? "srai" : "srli";
+    default: return "op-imm";
+    }
+  case 0x33:
+    if (funct7 == 0x01) {
+      switch (funct3) {
+      case 0x0: return "mul";
+      case 0x1: return "mulh";
+      case 0x2: return "mulhsu";
+      case 0x3: return "mulhu";
+      case 0x4: return "div";
+      case 0x5: return "divu";
+      case 0x6: return "rem";
+      case 0x7: return "remu";
+      default: return "mext";
+      }
+    }
+    switch (funct3) {
+    case 0x0: return (funct7 == 0x20) ? "sub" : "add";
+    case 0x1: return "sll";
+    case 0x2: return "slt";
+    case 0x3: return "sltu";
+    case 0x4: return "xor";
+    case 0x5: return (funct7 == 0x20) ? "sra" : "srl";
+    case 0x6: return "or";
+    case 0x7: return "and";
+    default: return "op";
+    }
+  case 0x73:
+    if (funct3 == 0x0) {
+      if (inst == 0x00000073u) return "ecall";
+      if (inst == 0x00100073u) return "ebreak";
+      if (inst == 0x30200073u) return "mret";
+      return "system";
+    }
+    switch (funct3) {
+    case 0x1: return "csrrw";
+    case 0x2: return "csrrs";
+    case 0x3: return "csrrc";
+    case 0x5: return "csrrwi";
+    case 0x6: return "csrrsi";
+    case 0x7: return "csrrci";
+    default: return "csr";
+    }
+  default:
+    return "unknown";
+  }
+}
+
+void print_inst_debug(uint32_t pc, uint32_t inst) {
+  uint32_t opcode = inst & 0x7f;
+  uint32_t rd = (inst >> 7) & 0x1f;
+  uint32_t funct3 = (inst >> 12) & 0x7;
+  uint32_t rs1 = (inst >> 15) & 0x1f;
+  uint32_t rs2 = (inst >> 20) & 0x1f;
+  uint32_t funct7 = (inst >> 25) & 0x7f;
+  int32_t imm_i = sign_extend(inst >> 20, 12);
+  int32_t imm_s = sign_extend(((inst >> 25) << 5) | ((inst >> 7) & 0x1f), 12);
+  int32_t imm_b = sign_extend(
+      ((inst >> 31) << 12) | (((inst >> 7) & 0x1) << 11) |
+          (((inst >> 25) & 0x3f) << 5) | (((inst >> 8) & 0xf) << 1),
+      13);
+  int32_t imm_j = sign_extend(
+      ((inst >> 31) << 20) | (((inst >> 12) & 0xff) << 12) |
+          (((inst >> 20) & 0x1) << 11) | (((inst >> 21) & 0x3ff) << 1),
+      21);
+  uint32_t imm_u = inst & 0xfffff000u;
+
+  std::fprintf(stderr,
+               "  inst=0x%08x (%s) opcode=0x%02x funct3=0x%x funct7=0x%02x\n",
+               inst, decode_mnemonic(inst), opcode, funct3, funct7);
+  std::fprintf(stderr,
+               "  rd=%u rs1=%u rs2=%u imm_i=%d imm_s=%d imm_b=%d imm_u=0x%08x imm_j=%d\n",
+               rd, rs1, rs2, imm_i, imm_s, imm_b, imm_u, imm_j);
+  std::fprintf(stderr, "  pc=0x%08x\n", pc);
 }
 
 constexpr uint32_t encode_r(uint32_t funct7, uint32_t rs2, uint32_t rs1,
@@ -108,7 +240,7 @@ struct CommitExp {
 
 std::vector<uint32_t> build_program() {
   std::vector<uint32_t> prog;
-  prog.reserve(200);
+  prog.reserve(220);
 
   // Prologue: setup base and registers
   prog.push_back(encode_u(0x80001000u, 10, 0x37)); // lui x10, 0x80001000
@@ -164,7 +296,11 @@ std::vector<uint32_t> build_program() {
   prog.push_back(encode_i(-1, 23, 0x2, 14, 0x13));     // slti x14, x23, -1
   prog.push_back(encode_i(-1, 23, 0x3, 13, 0x13));     // sltiu x13, x23, -1
 
-  // Skip shift-immediate ops for now (slli/srli/srai).
+  // Shift-immediate ops (slli/srli/srai).
+  prog.push_back(encode_i(3, 21, 0x1, 10, 0x13));         // slli x10, x21, 3
+  prog.push_back(encode_i(2, 21, 0x5, 11, 0x13));         // srli x11, x21, 2
+  prog.push_back(encode_i(-1, 0, 0x0, 12, 0x13));         // addi x12, x0, -1
+  prog.push_back(encode_i(0x404, 12, 0x5, 12, 0x13));     // srai x12, x12, 4
 
   // JAL/JALR control flow checks
   prog.push_back(encode_j(8, 6, 0x6f));                // jal x6, +8
@@ -191,6 +327,32 @@ std::vector<uint32_t> build_program() {
     prog.push_back(encode_r(0x00, 2, 1, 0x3, 12, 0x33));   // sltu x12, x1, x2
   }
 
+  // M-extension: Multiplier / Divider test
+  prog.push_back(encode_i(0x7fffffff, 0, 0x0, 13, 0x13));  // addi x13, x0, INT_MAX (actually lui + addi, simplified)
+  prog.push_back(encode_u(0x80000000u, 13, 0x37));         // lui x13, 0x80000000
+  prog.push_back(encode_i(-1, 13, 0x0, 13, 0x13));         // addi x13, x13, -1 -> INT_MAX
+
+  prog.push_back(encode_i(-1, 0, 0x0, 14, 0x13));          // addi x14, x0, -1
+  prog.push_back(encode_i(-2, 0, 0x0, 15, 0x13));          // addi x15, x0, -2
+  prog.push_back(encode_u(0x80000000u, 16, 0x37));         // lui x16, 0x80000000 (INT_MIN)
+  
+  prog.push_back(encode_r(0x01, 14, 15, 0x0, 17, 0x33));   // mul x17, x15, x14   (-2 * -1 = 2)
+  prog.push_back(encode_r(0x01, 14, 13, 0x1, 18, 0x33));   // mulh x18, x13, x14
+  prog.push_back(encode_r(0x01, 14, 13, 0x2, 19, 0x33));   // mulhsu x19, x13, x14
+  prog.push_back(encode_r(0x01, 14, 13, 0x3, 20, 0x33));   // mulhu x20, x13, x14
+
+  prog.push_back(encode_r(0x01, 14, 13, 0x4, 21, 0x33));   // div x21, x13, x14   (INT_MAX / -1 = -INT_MAX = 0x80000001)
+  prog.push_back(encode_r(0x01, 14, 16, 0x4, 22, 0x33));   // div x22, x16, x14   (INT_MIN / -1 = INT_MIN overflow)
+  prog.push_back(encode_r(0x01, 14, 13, 0x5, 23, 0x33));   // divu x23, x13, x14  (INT_MAX / 0xffffffff = 0)
+  prog.push_back(encode_r(0x01, 14, 16, 0x5, 24, 0x33));   // divu x24, x16, x14  (INT_MIN / 0xffffffff = 0)
+  
+  prog.push_back(encode_r(0x01, 14, 16, 0x6, 25, 0x33));   // rem x25, x16, x14   (INT_MIN % -1 = 0)
+  prog.push_back(encode_r(0x01, 15, 13, 0x6, 26, 0x33));   // rem x26, x13, x15   (INT_MAX % -2 = 1)
+  prog.push_back(encode_r(0x01, 14, 16, 0x7, 27, 0x33));   // remu x27, x16, x14  (INT_MIN % 0xffffffff = INT_MIN)
+
+  prog.push_back(encode_r(0x01, 0, 16, 0x4, 28, 0x33));    // div x28, x16, x0    (= -1)
+  prog.push_back(encode_r(0x01, 0, 16, 0x6, 29, 0x33));    // rem x29, x16, x0    (= x16)
+
   // Branch edge cases (taken and not taken)
   prog.push_back(encode_i(-1, 0, 0x0, 17, 0x13)); // addi x17, x0, -1
   prog.push_back(encode_i(1, 0, 0x0, 18, 0x13));  // addi x18, x0, 1
@@ -205,6 +367,23 @@ std::vector<uint32_t> build_program() {
   prog.push_back(encode_b(8, 18, 18, 0x0, 0x63)); // beq x18,x18,+8 (taken)
   prog.push_back(encode_i(6, 0, 0x0, 21, 0x13));  // addi x21, x0, 6 (skipped)
   prog.push_back(encode_i(7, 0, 0x0, 21, 0x13));  // addi x21, x0, 7
+
+  // Consecutive jumps and backward branch test
+  prog.push_back(encode_j(12, 22, 0x6f));         // jal x22, +12 (skips next 2)
+  prog.push_back(encode_i(8, 0, 0x0, 22, 0x13));  // addi x22, x0, 8 (skipped)
+  prog.push_back(encode_i(9, 0, 0x0, 22, 0x13));  // addi x22, x0, 9 (skipped)
+  prog.push_back(encode_j(8, 23, 0x6f));          // jal x23, +8 (skips next 1)
+  prog.push_back(encode_i(10, 0, 0x0, 23, 0x13)); // addi x23, x0, 10 (skipped)
+  prog.push_back(encode_u(0, 24, 0x17));          // auipc x24, 0
+  prog.push_back(encode_i(16, 24, 0x0, 24, 0x13)); // addi x24, x24, 16
+  prog.push_back(encode_i(0, 24, 0x0, 25, 0x67)); // jalr x25, 0(x24) (skips to auipc + 16, skips next 2)
+  prog.push_back(encode_i(11, 0, 0x0, 25, 0x13)); // addi x25, x0, 11 (skipped)
+  prog.push_back(encode_i(12, 0, 0x0, 25, 0x13)); // addi x25, x0, 12 (skipped)
+  
+  // Backward branch loop
+  prog.push_back(encode_i(3, 0, 0x0, 26, 0x13));  // addi x26, x0, 3 
+  prog.push_back(encode_i(-1, 26, 0x0, 26, 0x13)); // addi x26, x26, -1  (Target)
+  prog.push_back(encode_b(-4, 0, 26, 0x1, 0x63));  // bne x26, x0, -4 (jump to Target)
 
   // CSR tests: MSTATUS/MTVEC/MEPC/MCAUSE with six CSR ops.
   prog.push_back(encode_i(0x111, 0, 0x0, 5, 0x13)); // addi x5, x0, 0x111
@@ -232,6 +411,17 @@ std::vector<uint32_t> build_program() {
   prog.push_back(encode_i(kCsrMcause, 8, 0x1, 30, 0x73)); // csrrw x30, mcause, x8
   prog.push_back(encode_i(kCsrMcause, 6, 0x3, 31, 0x73)); // csrrc x31, mcause, x6
   prog.push_back(encode_i(kCsrMcause, 0, 0x2, 18, 0x73)); // csrrs x18, mcause, x0
+  prog.push_back(0x00100073u); // ebreak
+
+  // Extra CSR focus: rd=0 writeback suppression and zimm/rs1=0 read-only behavior
+  prog.push_back(encode_i(kCsrMstatus, 5, 0x1, 0, 0x73));  // csrrw  x0, mstatus, x5
+  prog.push_back(encode_i(kCsrMstatus, 0, 0x2, 9, 0x73));  // csrrs  x9, mstatus, x0 (read-only)
+  prog.push_back(encode_i(kCsrMstatus, 0, 0x6, 10, 0x73)); // csrrsi x10, mstatus, 0 (read-only)
+  prog.push_back(encode_i(kCsrMstatus, 0, 0x7, 11, 0x73)); // csrrci x11, mstatus, 0 (read-only)
+  prog.push_back(encode_i(kCsrMstatus, 6, 0x3, 0, 0x73));  // csrrc  x0, mstatus, x6
+  prog.push_back(encode_i(kCsrMtvec, 0, 0x6, 12, 0x73));   // csrrsi x12, mtvec, 0 (read-only)
+  prog.push_back(encode_i(kCsrMtvec, 0, 0x7, 13, 0x73));   // csrrci x13, mtvec, 0 (read-only)
+  prog.push_back(encode_i(kCsrMtvec, 7, 0x1, 0, 0x73));    // csrrw  x0, mtvec, x7
 
   // Terminate
   prog.push_back(0x00100073u); // ebreak
@@ -402,22 +592,74 @@ std::vector<CommitExp> run_reference(const std::vector<uint32_t> &prog) {
     case 0x33: { // OP
       uint32_t a = regs[rs1];
       uint32_t b = regs[rs2];
-      switch (funct3) {
-      case 0x0: wdata = (funct7 == 0x20) ? a - b : a + b; break; // add/sub
-      case 0x1: wdata = a << (b & 0x1f); break; // sll
-      case 0x2: wdata = (static_cast<int32_t>(a) < static_cast<int32_t>(b)) ? 1 : 0; break; // slt
-      case 0x3: wdata = (a < b) ? 1 : 0; break; // sltu
-      case 0x4: wdata = a ^ b; break; // xor
-      case 0x5:
-        if (funct7 == 0x20) {
-          wdata = static_cast<uint32_t>(static_cast<int32_t>(a) >> (b & 0x1f));
-        } else {
-          wdata = a >> (b & 0x1f);
+      if (funct7 == 0x01) { // M extension
+        int32_t s1 = static_cast<int32_t>(a);
+        int32_t s2 = static_cast<int32_t>(b);
+        switch (funct3) {
+        case 0x0: wdata = static_cast<uint32_t>(static_cast<uint64_t>(a) * static_cast<uint64_t>(b)); break; // mul
+        case 0x1: { // mulh
+          int64_t prod = static_cast<int64_t>(s1) * static_cast<int64_t>(s2);
+          wdata = static_cast<uint32_t>(static_cast<uint64_t>(prod) >> 32);
+          break;
         }
-        break;
-      case 0x6: wdata = a | b; break; // or
-      case 0x7: wdata = a & b; break; // and
-      default: wdata = 0; break;
+        case 0x2: { // mulhsu
+          int64_t prod = static_cast<int64_t>(s1) * static_cast<int64_t>(static_cast<uint32_t>(b));
+          wdata = static_cast<uint32_t>(static_cast<uint64_t>(prod) >> 32);
+          break;
+        }
+        case 0x3: { // mulhu
+          uint64_t prod = static_cast<uint64_t>(a) * static_cast<uint64_t>(b);
+          wdata = static_cast<uint32_t>(prod >> 32);
+          break;
+        }
+        case 0x4: { // div
+          if (b == 0) {
+            wdata = 0xffffffffu;
+          } else if (a == 0x80000000u && b == 0xffffffffu) {
+            wdata = a;
+          } else {
+            wdata = static_cast<uint32_t>(s1 / s2);
+          }
+          break;
+        }
+        case 0x5: { // divu
+          wdata = (b == 0) ? 0xffffffffu : (a / b);
+          break;
+        }
+        case 0x6: { // rem
+          if (b == 0) {
+            wdata = a;
+          } else if (a == 0x80000000u && b == 0xffffffffu) {
+            wdata = 0;
+          } else {
+            wdata = static_cast<uint32_t>(s1 % s2);
+          }
+          break;
+        }
+        case 0x7: { // remu
+          wdata = (b == 0) ? a : (a % b);
+          break;
+        }
+        default: wdata = 0; break;
+        }
+      } else {
+        switch (funct3) {
+        case 0x0: wdata = (funct7 == 0x20) ? a - b : a + b; break; // add/sub
+        case 0x1: wdata = a << (b & 0x1f); break; // sll
+        case 0x2: wdata = (static_cast<int32_t>(a) < static_cast<int32_t>(b)) ? 1 : 0; break; // slt
+        case 0x3: wdata = (a < b) ? 1 : 0; break; // sltu
+        case 0x4: wdata = a ^ b; break; // xor
+        case 0x5:
+          if (funct7 == 0x20) {
+            wdata = static_cast<uint32_t>(static_cast<int32_t>(a) >> (b & 0x1f));
+          } else {
+            wdata = a >> (b & 0x1f);
+          }
+          break;
+        case 0x6: wdata = a | b; break; // or
+        case 0x7: wdata = a & b; break; // and
+        default: wdata = 0; break;
+        }
       }
       wen = true;
       break;
@@ -428,6 +670,13 @@ std::vector<CommitExp> run_reference(const std::vector<uint32_t> &prog) {
           // ebreak
           commits.push_back({pc, 0, 0, false});
           return commits;
+        }
+        if (inst == 0x00000073u) { // ecall
+          mepc = pc;
+          mcause = 11;
+          next_pc = mtvec;
+        } else if (inst == 0x30200073u) { // mret
+          next_pc = mepc;
         }
         break;
       }
@@ -479,6 +728,50 @@ std::vector<CommitExp> run_reference(const std::vector<uint32_t> &prog) {
   return commits;
 }
 
+void reset_memory(size_t size) {
+  g_mem.assign(size, 0);
+}
+
+bool parse_size_arg(const char *arg, size_t *out) {
+  if (!arg || !*arg || !out) return false;
+  char *end = nullptr;
+  unsigned long long val = std::strtoull(arg, &end, 0);
+  if (!end || *end != '\0') return false;
+  *out = static_cast<size_t>(val);
+  return true;
+}
+
+bool load_binary_file(const char *path, uint32_t base, size_t *loaded_size) {
+  if (!path || !*path) return false;
+  std::FILE *fp = std::fopen(path, "rb");
+  if (!fp) return false;
+  if (std::fseek(fp, 0, SEEK_END) != 0) {
+    std::fclose(fp);
+    return false;
+  }
+  long sz = std::ftell(fp);
+  if (sz <= 0) {
+    std::fclose(fp);
+    return false;
+  }
+  std::rewind(fp);
+  size_t size = static_cast<size_t>(sz);
+  if (base < kBase) {
+    std::fclose(fp);
+    return false;
+  }
+  size_t offset = static_cast<size_t>(base - kBase);
+  size_t needed = offset + size;
+  if (needed > g_mem.size()) {
+    g_mem.resize(needed, 0);
+  }
+  size_t read = std::fread(g_mem.data() + offset, 1, size, fp);
+  std::fclose(fp);
+  if (read != size) return false;
+  if (loaded_size) *loaded_size = size;
+  return true;
+}
+
 void load_program(const std::vector<uint32_t> &prog) {
   for (size_t i = 0; i < prog.size(); ++i) {
     uint32_t addr = kBase + static_cast<uint32_t>(i * 4);
@@ -528,120 +821,247 @@ extern "C" void pmem_write(long long waddr, long long wdata, unsigned char len) 
 extern "C" void npc_ebreak() { g_ebreak_called = true; }
 
 int main(int argc, char **argv) {
-  auto program = build_program();
-  load_program(program);
-  auto expected = run_reference(program);
+  const char *bin_path = nullptr;
+  size_t max_cycles_override = 0;
+  size_t mem_size_override = 0;
+  bool enable_trace = true;
+  bool require_ebreak = false;
 
-  if (program.size() < 100) {
-    std::fprintf(stderr, "Program too short: %zu instructions\n", program.size());
-    return 1;
+  for (int i = 1; i < argc; ++i) {
+    if (std::strcmp(argv[i], "--bin") == 0 && (i + 1) < argc) {
+      bin_path = argv[++i];
+    } else if (std::strcmp(argv[i], "--max-cycles") == 0 && (i + 1) < argc) {
+      size_t val = 0;
+      if (parse_size_arg(argv[++i], &val)) {
+        max_cycles_override = val;
+      }
+    } else if (std::strcmp(argv[i], "--mem-size") == 0 && (i + 1) < argc) {
+      size_t val = 0;
+      if (parse_size_arg(argv[++i], &val)) {
+        mem_size_override = val;
+      }
+    } else if (std::strcmp(argv[i], "--no-trace") == 0) {
+      enable_trace = false;
+    } else if (std::strcmp(argv[i], "--require-ebreak") == 0) {
+      require_ebreak = true;
+    }
+  }
+
+  if (!bin_path) bin_path = kDefaultBinPath;
+
+  bool use_binary = false;
+  size_t loaded_size = 0;
+  size_t mem_size = mem_size_override ? mem_size_override : kDefaultMemSize;
+
+  reset_memory(mem_size);
+  if (load_binary_file(bin_path, kBase, &loaded_size)) {
+    use_binary = true;
+    std::fprintf(stderr,
+                 "Loaded binary: %s (%zu bytes) @0x%08x, mem=%zu bytes\n",
+                 bin_path, loaded_size, kBase,
+                 static_cast<size_t>(g_mem.size()));
+  } else {
+    std::fprintf(stderr,
+                 "Binary not found at %s, falling back to built-in test program.\n",
+                 bin_path);
+  }
+
+  std::vector<uint32_t> program;
+  std::vector<CommitExp> expected;
+  if (!use_binary) {
+    reset_memory(kSelfTestMemSize);
+    program = build_program();
+    load_program(program);
+    expected = run_reference(program);
+    if (program.size() < 100) {
+      std::fprintf(stderr, "Program too short: %zu instructions\n", program.size());
+      return 1;
+    }
   }
 
   VerilatedContext ctx;
   ctx.commandArgs(argc, argv);
-  ctx.traceEverOn(true);
+  if (enable_trace) {
+    ctx.traceEverOn(true);
+  }
 
   auto top = std::make_unique<VCoreTop>(&ctx);
 
   VerilatedVcdC tfp;
-  top->trace(&tfp, 20);
-  tfp.open("build/verilator/wave.vcd");
+  VerilatedVcdC *tfp_ptr = nullptr;
+  if (enable_trace) {
+    top->trace(&tfp, 20);
+    tfp.open("build/verilator/wave.vcd");
+    tfp_ptr = &tfp;
+  }
 
   top->clock = 0;
   top->reset = 1;
 
   // Reset for a few cycles.
-  eval_low(top.get(), &ctx, &tfp);
-  eval_high(top.get(), &ctx, &tfp);
-  eval_low(top.get(), &ctx, &tfp);
-  eval_high(top.get(), &ctx, &tfp);
-  eval_low(top.get(), &ctx, &tfp);
-  eval_high(top.get(), &ctx, &tfp);
+  eval_low(top.get(), &ctx, tfp_ptr);
+  eval_high(top.get(), &ctx, tfp_ptr);
+  eval_low(top.get(), &ctx, tfp_ptr);
+  eval_high(top.get(), &ctx, tfp_ptr);
+  eval_low(top.get(), &ctx, tfp_ptr);
+  eval_high(top.get(), &ctx, tfp_ptr);
   top->reset = 0;
 
-  size_t idx = 0;
-  bool started = false;
-  int errors = 0;
-  const size_t max_cycles = expected.size() + 50;
+  g_ebreak_called = false;
 
-  for (size_t cycles = 0; cycles < max_cycles; ++cycles) {
-    eval_low(top.get(), &ctx, &tfp);
-    const uint32_t pc = top->io_commit_pc;
-    const bool wen = top->io_commit_wen != 0;
+  if (!use_binary) {
+    auto inst_at_pc = [&](uint32_t pc) -> uint32_t {
+      if (pc < kBase) return 0;
+      uint32_t idx = (pc - kBase) >> 2;
+      if (idx >= program.size()) return 0;
+      return program[idx];
+    };
+
+    size_t idx = 0;
+    bool started = false;
+    int errors = 0;
+    const size_t max_cycles = expected.size() + 50;
+
+    for (size_t cycles = 0; cycles < max_cycles; ++cycles) {
+      eval_low(top.get(), &ctx, tfp_ptr);
+      const uint32_t pc = top->io_commit_pc;
+      const bool wen = top->io_commit_wen != 0;
+
+      if (!started) {
+        if (pc == expected[0].pc) {
+          started = true;
+        } else {
+          eval_high(top.get(), &ctx, tfp_ptr);
+          continue;
+        }
+      }
+
+      if (idx >= expected.size()) {
+        break;
+      }
+
+      const auto &exp = expected[idx];
+      if (pc != exp.pc) {
+        std::fprintf(stderr,
+                     "PC mismatch at commit %zu: got 0x%08x expected 0x%08x\n",
+                     idx, pc, exp.pc);
+        std::fprintf(stderr, "Actual instruction:\n");
+        print_inst_debug(pc, inst_at_pc(pc));
+        std::fprintf(stderr, "Expected instruction:\n");
+        print_inst_debug(exp.pc, inst_at_pc(exp.pc));
+        errors++;
+        break;
+      }
+      if (wen != exp.wen) {
+        std::fprintf(stderr,
+                     "WEN mismatch at pc=0x%08x: got %u expected %u\n", pc,
+                     static_cast<uint32_t>(wen), static_cast<uint32_t>(exp.wen));
+        std::fprintf(stderr, "Instruction:\n");
+        print_inst_debug(pc, inst_at_pc(pc));
+        errors++;
+      }
+      if (exp.wen) {
+        if (top->io_commit_rd != exp.rd) {
+          std::fprintf(stderr,
+                       "RD mismatch at pc=0x%08x: got %u expected %u\n", pc,
+                       top->io_commit_rd, exp.rd);
+          std::fprintf(stderr, "Instruction:\n");
+          print_inst_debug(pc, inst_at_pc(pc));
+          errors++;
+        }
+        if (top->io_commit_wdata != exp.wdata) {
+          std::fprintf(stderr,
+                       "WDATA mismatch at pc=0x%08x: got 0x%08x expected 0x%08x\n",
+                       pc, top->io_commit_wdata, exp.wdata);
+          std::fprintf(stderr, "Instruction:\n");
+          print_inst_debug(pc, inst_at_pc(pc));
+          errors++;
+        }
+      }
+
+      eval_high(top.get(), &ctx, tfp_ptr);
+      idx++;
+      if (g_ebreak_called) {
+        break;
+      }
+      if (idx == expected.size()) {
+        break;
+      }
+    }
+
+    top->final();
+    if (enable_trace) tfp.close();
 
     if (!started) {
-      if (pc == expected[0].pc) {
+      std::fprintf(stderr, "No commits observed.\n");
+      return 1;
+    }
+    if (!g_ebreak_called) {
+      std::fprintf(stderr, "Ebreak was not observed.\n");
+      return 1;
+    }
+    if (idx != expected.size()) {
+      std::fprintf(stderr, "Only %zu/%zu commits observed.\n", idx, expected.size());
+      return 1;
+    }
+    if (errors != 0) {
+      std::fprintf(stderr, "Verification failed with %d errors.\n", errors);
+      return 1;
+    }
+
+    std::printf("PASS: %zu instructions committed. Waveform: build/verilator/wave.vcd\n",
+                expected.size());
+    return 0;
+  }
+
+  const size_t max_cycles = max_cycles_override ? max_cycles_override
+                                                : kDefaultMaxCycles;
+  bool started = false;
+  size_t active_cycles = 0;
+  size_t write_commits = 0;
+  uint32_t last_pc = 0;
+  size_t cycles_run = 0;
+
+  for (size_t cycles = 0; cycles < max_cycles; ++cycles) {
+    cycles_run = cycles + 1;
+    eval_low(top.get(), &ctx, tfp_ptr);
+    uint32_t pc = top->io_commit_pc;
+    if (!started) {
+      if (addr_in_range(pc)) {
         started = true;
       } else {
-        eval_high(top.get(), &ctx, &tfp);
+        eval_high(top.get(), &ctx, tfp_ptr);
         continue;
       }
     }
-
-    if (idx >= expected.size()) {
-      break;
+    active_cycles++;
+    last_pc = pc;
+    if (top->io_commit_wen != 0) {
+      write_commits++;
     }
 
-    const auto &exp = expected[idx];
-    if (pc != exp.pc) {
-      std::fprintf(stderr,
-                   "PC mismatch at commit %zu: got 0x%08x expected 0x%08x\n",
-                   idx, pc, exp.pc);
-      errors++;
-      break;
-    }
-    if (wen != exp.wen) {
-      std::fprintf(stderr,
-                   "WEN mismatch at pc=0x%08x: got %u expected %u\n", pc,
-                   static_cast<uint32_t>(wen), static_cast<uint32_t>(exp.wen));
-      errors++;
-    }
-    if (exp.wen) {
-      if (top->io_commit_rd != exp.rd) {
-        std::fprintf(stderr,
-                     "RD mismatch at pc=0x%08x: got %u expected %u\n", pc,
-                     top->io_commit_rd, exp.rd);
-        errors++;
-      }
-      if (top->io_commit_wdata != exp.wdata) {
-        std::fprintf(stderr,
-                     "WDATA mismatch at pc=0x%08x: got 0x%08x expected 0x%08x\n",
-                     pc, top->io_commit_wdata, exp.wdata);
-        errors++;
-      }
-    }
-
-    eval_high(top.get(), &ctx, &tfp);
-    idx++;
+    eval_high(top.get(), &ctx, tfp_ptr);
     if (g_ebreak_called) {
-      break;
-    }
-    if (idx == expected.size()) {
       break;
     }
   }
 
   top->final();
-  tfp.close();
+  if (enable_trace) tfp.close();
 
   if (!started) {
-    std::fprintf(stderr, "No commits observed.\n");
+    std::fprintf(stderr, "No commits observed in binary run.\n");
     return 1;
   }
-  if (!g_ebreak_called) {
+
+  std::printf(
+      "RUN: cycles=%zu active=%zu write_commits=%zu last_pc=0x%08x ebreak=%s\n",
+      cycles_run, active_cycles, write_commits, last_pc,
+      g_ebreak_called ? "yes" : "no");
+
+  if (require_ebreak && !g_ebreak_called) {
     std::fprintf(stderr, "Ebreak was not observed.\n");
     return 1;
   }
-  if (idx != expected.size()) {
-    std::fprintf(stderr, "Only %zu/%zu commits observed.\n", idx, expected.size());
-    return 1;
-  }
-  if (errors != 0) {
-    std::fprintf(stderr, "Verification failed with %d errors.\n", errors);
-    return 1;
-  }
-
-  std::printf("PASS: %zu instructions committed. Waveform: build/verilator/wave.vcd\n",
-              expected.size());
   return 0;
 }

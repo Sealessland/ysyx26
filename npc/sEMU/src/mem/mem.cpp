@@ -10,7 +10,7 @@ static uint64_t get_time_internal() {
     struct timeval now;
     gettimeofday(&now, NULL);
     uint64_t us = now.tv_sec * 1000000ULL + now.tv_usec;
-    return us;
+    return 0;
 }
 
 guest_mem::guest_mem(size_t base, size_t sz) 
@@ -64,6 +64,11 @@ uint64_t guest_mem::pmem_read(size_t addr, int len) {
 }
 
 void guest_mem::pmem_write(size_t addr, int len, uint64_t data) {
+    if (addr >= 0x80020395 && addr <= 0x80020398) {
+        // %08x 表示输出8位十六进制数，不足前面补0
+        // 如果 data 是 64 位的，请将 %x 换成 %lx 或 %llx
+        printf("[Mem] Write to 0x%08x with data 0x%x\n", addr, (unsigned int)data);
+    }
     switch (len) {
         case 1: *reinterpret_cast<uint8_t*>(get_host_ptr(addr)) = (uint8_t)data; break;
         case 2: *reinterpret_cast<uint16_t*>(get_host_ptr(addr)) = (uint16_t)data; break;
@@ -126,23 +131,34 @@ void guest_mem::mem_init(){
     // j     0
     
     const uint32_t hardcoded_insts[] = {
-          0x00000297,  // auipc t0,0
-  0x00028823,  // sb  zero,16(t0)
-  0x0102c503,  // lbu a0,16(t0)
-  0x00100073,  // ebreak (used as nemu_trap)
-  0xdeadbeef,  // some data
-        0xa0000537, // lui   a0, 0xa0000
-        0x3f850513, // addi  a0, a0, 0x3f8
-        0x06400593, // addi  a1, x0, 100 ('d')
-        0x00b50023, // sb    a1, 0(a0)
-        0x07800593, // addi  a1, x0, 120 ('x')
-        0x00b50023, // sb    a1, 0(a0)
-        0x07900593, // addi  a1, x0, 121 ('y')
-        0x00b50023, // sb    a1, 0(a0)
-        0x00a00593, // addi  a1, x0, 10 ('\n')
-        0x00b50023, // sb    a1, 0(a0)
-        0x00100073, // ebreak
-        0x0000006f  // j     0
+// === 新增：CSR mtvec 读写测试 ===
+  // 1. 准备要写入 mtvec 的测试值 (目标: 0x8001ef20)
+  0x8001f3b7, // lui   t2, 0x8001f     (t2 = 0x8001f000)
+  0xf2038393, // addi  t2, t2, -224    (t2 = 0x8001ef20)
+
+  // 2. 写入 mtvec 寄存器 (CSR 地址: 0x305)
+  0x30539073, // csrw  mtvec, t2       (mtvec = t2)
+
+  // 3. 将 mtvec 的值读出到 a5 (x15) 寄存器，供 Difftest 检查
+  0x305027f3, // csrr  a5, mtvec       (a5 = mtvec)
+
+  // === 原有：串口打印确认信息 (打印 "MVC\n") ===
+  0xa0000537, // lui   a0, 0xa0000     (a0 = 0xa0000000)
+  0x3f850513, // addi  a0, a0, 0x3f8   (a0 = 0xa00003f8)
+  
+  0x04d00593, // addi  a1, x0, 77      (a1 = 'M')
+  0x00b50023, // sb    a1, 0(a0)       (SERIAL_PORT <- 'M')
+  
+  0x05600593, // addi  a1, x0, 86      (a1 = 'V')
+  0x00b50023, // sb    a1, 0(a0)       (SERIAL_PORT <- 'V')
+  
+  0x04300593, // addi  a1, x0, 67      (a1 = 'C')
+  0x00b50023, // sb    a1, 0(a0)       (SERIAL_PORT <- 'C')
+  
+  0x00a00593, // addi  a1, x0, 10      (a1 = '\n')
+  0x00b50023, // sb    a1, 0(a0)       (SERIAL_PORT <- '\n')
+
+  0x00100073, // ebreak                (触发 NEMU Trap，结束仿真)
     };
     
     // 将指令加载到起始地址 (base_addr)

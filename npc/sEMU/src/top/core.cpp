@@ -146,6 +146,30 @@ bool Core::is_commit_wen() const {
     return top->io_commit_wen;
 }
 
+uint32_t Core::get_commit_inst() const {
+    return top->io_commit_inst;
+}
+
+bool Core::is_commit_store() const {
+    return top->io_commit_is_store;
+}
+
+bool Core::is_commit_halt() const {
+    return top->io_commit_halt;
+}
+
+uint32_t Core::get_commit_csr_waddr() const {
+    return top->io_commit_csr_waddr;
+}
+
+uint32_t Core::get_commit_csr_wdata() const {
+    return top->io_commit_csr_wdata;
+}
+
+bool Core::is_commit_csr_wen() const {
+    return top->io_commit_csr_wen;
+}
+
 const char* reg_names[] = {
     "$0", "ra", "sp", "gp", "tp", "t0", "t1", "t2",
     "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5",

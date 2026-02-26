@@ -35,10 +35,16 @@ class alignas(VL_CACHE_LINE_BYTES) VCoreTop VL_NOT_FINAL : public VerilatedModel
     VL_IN8(&clock,0,0);
     VL_IN8(&reset,0,0);
     VL_OUT8(&io_commit_valid,0,0);
+    VL_OUT8(&io_commit_is_store,0,0);
+    VL_OUT8(&io_commit_halt,0,0);
     VL_OUT8(&io_commit_rd,4,0);
     VL_OUT8(&io_commit_wen,0,0);
+    VL_OUT8(&io_commit_csr_wen,0,0);
+    VL_OUT16(&io_commit_csr_waddr,11,0);
     VL_OUT(&io_commit_pc,31,0);
+    VL_OUT(&io_commit_inst,31,0);
     VL_OUT(&io_commit_wdata,31,0);
+    VL_OUT(&io_commit_csr_wdata,31,0);
 
     // CELLS
     // Public to allow access to /* verilator public */ items.

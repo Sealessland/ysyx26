@@ -12,6 +12,7 @@
 #include <cstdlib>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include "sEMU/utils/colors.hpp"
 
 SDB::SDB(Core* core, guest_mem* mem, ElfLoader* loader) : core(core), mem(mem), elf_loader(loader) {
 }
@@ -31,12 +32,13 @@ static std::vector<std::string> split_args(const std::string& line) {
 void SDB::cmd_c(const std::vector<std::string>& args) {
     (void)args;
     core->state = CoreState::RUNNING;
-    // 持续运行直到遇到程序退出点 (比如 ebreak 里修改了 state)
-    while (core->state == CoreState::RUNNING) {
-        core->step();
-    }
+    uint64_t executed = exec_si_bare(-1ULL); // Run infinitely
     if (core->state == CoreState::END) {
-        std::cout << "Program execution has ended (EBREAK)." << std::endl;
+        std::cout << ANSI_COLOR_RED << "Program execution has ended (EBREAK). Executed " 
+                  << executed << " instructions." << ANSI_COLOR_RESET << std::endl;
+    } else {
+        std::cout << ANSI_COLOR_YELLOW << "Execution paused at PC: 0x" << std::hex << core->get_commit_pc() << std::dec 
+                  << " after " << executed << " instructions." << ANSI_COLOR_RESET << std::endl;
     }
 }
 
@@ -48,64 +50,65 @@ void SDB::cmd_q(const std::vector<std::string>& args) {
 extern bool g_trace_mem;
 extern std::vector<std::string> mem_access_log;
 
-void SDB::cmd_si(const std::vector<std::string>& args) {
-    int steps = 1;
-    std::string mode = "bare"; // 默认使用 bare-metal
-
-    if (!args.empty()) {
-        try { steps = std::stoi(args[0]); }
-        catch (...) { std::cout << "Invalid argument: " << args[0] << std::endl; return; }
-    }
-    if (args.size() > 1) {
-        mode = args[1];
-    }
-
-    core->state = CoreState::RUNNING;
+uint64_t SDB::exec_si_bare(uint64_t steps) {
+    g_trace_mem = false;
     CoreSimRange sim_range(core);
-    int count = 0;
+    uint64_t count = 0;
 
-    auto check_limit = [&]() {
-        if (++count >= steps) {
-            core->state = CoreState::STOPPED;
-        }
-    };
-
-    if (mode == "bare") {
-        g_trace_mem = false;
-        run_simulation(sim_range, [&](const CoreCommitState& state) {
-            check_limit();
-        });
-    } 
-    else if (mode == "trace") {
-        g_trace_mem = true;
-        mem_access_log.clear(); // 清理旧日志
-        
-        run_simulation(sim_range, [&](const CoreCommitState& state) {
-            if (state.is_commit_valid()) {
-                std::cout << "======================================\n";
-                std::cout << "[Trace] PC: 0x" << std::hex << state.get_commit_pc() << std::dec << "\n";
-                // 打印所有寄存器
-                state.get_core()->print_registers();
-                // 打印这周期发生的访存行为
-                for (const auto& log : mem_access_log) {
-                    std::cout << "[Mem] " << log << "\n";
-                }
+    run_simulation(sim_range, [&](const CoreCommitState& state) {
+        if (state.is_commit_valid()) {
+            if (++count >= steps) {
+                const_cast<Core*>(state.get_core())->state = CoreState::STOPPED;
             }
-            mem_access_log.clear();
-            check_limit();
-        });
-        g_trace_mem = false;
-    } 
-    else if (mode == "diff") {
-        g_trace_mem = false;
-#ifdef CONFIG_DIFFTEST
-        int commit_count = 0;
-        bool check_pending = false;
-        CPU_state dut_state_to_check;
+        }
+    });
+    return count;
+}
 
-        run_simulation(sim_range, [&](const CoreCommitState& state) {
-            // If we have a pending check, do it now (PC and registers should be updated)
-            if (check_pending) {
+uint64_t SDB::exec_si_trace(uint64_t steps) {
+    g_trace_mem = true;
+    mem_access_log.clear(); // 清理旧日志
+    
+    CoreSimRange sim_range(core);
+    uint64_t count = 0;
+
+    run_simulation(sim_range, [&](const CoreCommitState& state) {
+        if (state.is_commit_valid()) {
+            std::cout << ANSI_COLOR_CYAN << "======================================\n";
+            std::cout << "[Trace] PC: 0x" << std::hex << state.get_commit_pc() << std::dec << "\n";
+            // 打印所有寄存器
+            state.get_core()->print_registers();
+            // 打印这周期发生的访存行为
+            for (const auto& log : mem_access_log) {
+                std::cout << "[Mem] " << log << "\n";
+            }
+            std::cout << ANSI_COLOR_RESET;
+            
+            if (++count >= steps) {
+                const_cast<Core*>(state.get_core())->state = CoreState::STOPPED;
+            }
+        }
+        mem_access_log.clear();
+    });
+    g_trace_mem = false;
+    return count;
+}
+
+uint64_t SDB::exec_si_diff(uint64_t steps) {
+    g_trace_mem = false;
+    CoreSimRange sim_range(core);
+    uint64_t count = 0;
+
+#ifdef CONFIG_DIFFTEST
+    int commit_count = 0;
+    bool check_pending = false;
+    bool skip_next_check = false;
+    CPU_state dut_state_to_check;
+
+    run_simulation(sim_range, [&](const CoreCommitState& state) {
+        // If we have a pending check, do it now (PC and registers should be updated)
+        if (check_pending) {
+            if (!skip_next_check) {
                 // Get the updated DUT state
                 for (int i = 0; i < 32; ++i) {
                     dut_state_to_check.gpr[i] = state.get_core()->get_reg(i);
@@ -116,62 +119,94 @@ void SDB::cmd_si(const std::vector<std::string>& args) {
                 if (!difftest.check_registers(dut_state_to_check)) {
                     const_cast<Core*>(state.get_core())->state = CoreState::STOPPED;
                 }
-                check_pending = false;
             }
-
-            // When DUT commits an instruction
-            if (state.is_commit_valid() && !check_pending && state.get_core()->state == CoreState::RUNNING) {
-                // Step REF by 1 instruction
-                difftest.step(1);
-
-                // Build DUT state using commit signals for register writeback
-                for (int i = 0; i < 32; ++i) {
-                    dut_state_to_check.gpr[i] = state.get_core()->get_reg(i);
-                }
-
-                // If this instruction writes to a register, update it with the commit data
-                if (state.get_core()->is_commit_wen()) {
-                    uint8_t rd = state.get_core()->get_commit_rd();
-                    uint32_t wdata = state.get_core()->get_commit_wdata();
-                    if (rd != 0) {  // x0 is always 0
-                        dut_state_to_check.gpr[rd] = wdata;
-                    }
-                }
-
-                // PC will be checked in the next cycle after it updates
-                // Schedule check on next cycle
-                check_pending = true;
-
-                // Count commits
-                if (++commit_count >= steps) {
-                    // Don't stop immediately, let the PC update
-                }
-            }
-
-            // Stop after we've committed and checked all instructions
-            if (commit_count >= steps && !check_pending) {
-                const_cast<Core*>(state.get_core())->state = CoreState::STOPPED;
-            }
-        });
-
-        // If we finished with a pending check, do one final check
-        if (check_pending) {
-            // Step the simulation one more time to let PC update
-            run_simulation(sim_range, [&](const CoreCommitState& state) {
-                for (int i = 0; i < 32; ++i) {
-                    dut_state_to_check.gpr[i] = state.get_core()->get_reg(i);
-                }
-                dut_state_to_check.pc = state.get_core()->get_reg_by_name("pc");
-                difftest.check_registers(dut_state_to_check);
-                const_cast<Core*>(state.get_core())->state = CoreState::STOPPED;
-            });
+            check_pending = false;
+            skip_next_check = false;
         }
-#else
+
+        // When DUT commits an instruction
+        if (state.is_commit_valid() && !check_pending && state.get_core()->state == CoreState::RUNNING) {
+            // Step REF by 1 instruction
+            difftest.step(1);
+
+            // Build DUT state using commit signals for register writeback
+            for (int i = 0; i < 32; ++i) {
+                dut_state_to_check.gpr[i] = state.get_core()->get_reg(i);
+            }
+
+            // If this instruction writes to a register, update it with the commit data
+            if (state.get_core()->is_commit_wen()) {
+                uint8_t rd = state.get_core()->get_commit_rd();
+                uint32_t wdata = state.get_core()->get_commit_wdata();
+                if (rd != 0) {  // x0 is always 0
+                    dut_state_to_check.gpr[rd] = wdata;
+                }
+            }
+
+            // PC will be checked in the next cycle after it updates
+            // Schedule check on next cycle
+            check_pending = true;
+
+            // Count commits
+            count++;
+            if (++commit_count >= steps) {
+                // Don't stop immediately, let the PC update
+            }
+        }
+
+        // Stop after we've committed and checked all instructions
+        if (commit_count >= steps && !check_pending) {
+            const_cast<Core*>(state.get_core())->state = CoreState::STOPPED;
+        }
+    });
+
+    // If we finished with a pending check, do one final check
+    if (check_pending && !skip_next_check) {
+        // Step the simulation one more time to let PC update
         run_simulation(sim_range, [&](const CoreCommitState& state) {
-            std::cout << "[Difftest] Disabled during compilation (CONFIG_DIFFTEST not defined).\n";
+            for (int i = 0; i < 32; ++i) {
+                dut_state_to_check.gpr[i] = state.get_core()->get_reg(i);
+            }
+            dut_state_to_check.pc = state.get_core()->get_reg_by_name("pc");
+            if (!difftest.check_registers(dut_state_to_check)) {
+                const_cast<Core*>(state.get_core())->state = CoreState::STOPPED;
+            }
             const_cast<Core*>(state.get_core())->state = CoreState::STOPPED;
         });
+    }
+#else
+    run_simulation(sim_range, [&](const CoreCommitState& state) {
+        std::cout << "[Difftest] Disabled during compilation (CONFIG_DIFFTEST not defined).\n";
+        const_cast<Core*>(state.get_core())->state = CoreState::STOPPED;
+    });
 #endif
+    return count;
+}
+
+
+void SDB::cmd_si(const std::vector<std::string>& args) {
+    uint64_t steps = 1;
+    std::string mode = "bare"; // 默认使用 bare-metal
+
+    if (!args.empty()) {
+        try { steps = std::stoull(args[0]); }
+        catch (...) { std::cout << "Invalid argument: " << args[0] << std::endl; return; }
+    }
+    if (args.size() > 1) {
+        mode = args[1];
+    }
+
+    core->state = CoreState::RUNNING;
+    uint64_t executed_steps = 0;
+
+    if (mode == "bare") {
+        executed_steps = exec_si_bare(steps);
+    } 
+    else if (mode == "trace") {
+        executed_steps = exec_si_trace(steps);
+    } 
+    else if (mode == "diff") {
+        executed_steps = exec_si_diff(steps);
     }
     else {
         std::cout << "Unknown mode: " << mode << ". Please use 'bare', 'trace', or 'diff'.\n";
@@ -180,9 +215,9 @@ void SDB::cmd_si(const std::vector<std::string>& args) {
     }
 
     if (core->state == CoreState::END) {
-        std::cout << "Program execution has ended (EBREAK)." << std::endl;
+        std::cout << ANSI_COLOR_RED << "Program execution has ended (EBREAK). Executed " << executed_steps << " instructions." << ANSI_COLOR_RESET << std::endl;
     } else {
-        std::cout << "Execution paused at PC: 0x" << std::hex << core->get_commit_pc() << std::dec << " after " << steps << " steps." << std::endl;
+        std::cout << ANSI_COLOR_YELLOW << "Execution paused at PC: 0x" << std::hex << core->get_commit_pc() << std::dec << " after " << executed_steps << " steps." << ANSI_COLOR_RESET << std::endl;
     }
 }
 
@@ -334,7 +369,7 @@ void SDB::cmd_trace_func(const std::vector<std::string>& args) {
     run_simulation(sim_range, action);
 
     if (core->state == CoreState::END) {
-        std::cout << "Program execution has ended (EBREAK).\n";
+        std::cout << ANSI_COLOR_RED << "Program execution has ended (EBREAK).\n" << ANSI_COLOR_RESET;
     }
     g_trace_mem = false;
 }
@@ -352,7 +387,7 @@ void SDB::cmd_help(const std::vector<std::string>& args) {
 
 void SDB::sdb_mainloop() {
     char* line_read;
-    while ((line_read = readline("(sEMU) ")) != nullptr) {
+    while ((line_read = readline(ANSI_COLOR_GREEN "(sEMU) " ANSI_COLOR_RESET)) != nullptr) {
         if (line_read && *line_read) {
             add_history(line_read);
             std::string line(line_read);

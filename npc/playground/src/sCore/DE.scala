@@ -11,6 +11,7 @@ import sCore.utils.DecodeRules._
 // 1. 传输结构体 (Bundle) - 采用正交多维解码结构
 // -----------------------------------------------------------------------------
 class DecodedMsg(implicit p: CoreConfig) extends CoreBundle {
+  val inst      = UInt(32.W)
   val pc        = UInt(vaddrBits.W)
   val imm       = UInt(xlen.W) // 经过统一拓展的安全立即数
   
@@ -21,6 +22,7 @@ class DecodedMsg(implicit p: CoreConfig) extends CoreBundle {
   val aluOp     = AluOp()
   val bruOp     = BruOp()
   val csrOp     = CsrOp()
+  val mduOp     = MduOp()
   val memCmd    = MemCmd()
   val memSize   = MemSize()
   val memSign   = Bool()
@@ -53,7 +55,7 @@ class IDU()(implicit p: CoreConfig) extends CoreModule {
   // 1. 数据驱动：从数据库加载目标指令集，并根据参数化配置过滤不需要的指令 (避免产生多余译码元件)
   val instTable = org.chipsalliance.rvdecoderdb.instructions(os.pwd / "riscv-opcodes")
   
-  val baseSets = Seq("rv_i", "rv_system") ++
+  val baseSets = Seq("rv_i", "rv_system", "rv64_i") ++
                  (if (hasM) Seq("rv_m") else Seq()) ++
                  (if (hasA) Seq("rv_a") else Seq()) ++
                  (if (hasZicsr) Seq("rv_zicsr") else Seq()) ++
@@ -88,13 +90,17 @@ class IDU()(implicit p: CoreConfig) extends CoreModule {
   val msg = Wire(new DecodedMsg)
   msg := DontCare // 兜底防止出现锁存器
   
+  msg.inst      := inst
   msg.pc        := inData.pc
   msg.imm       := ImmGen(inst, decodedBundle(ImmTypeExp), xlen) // 调用封装的生成器
   
   msg.rdaddr    := inst(11, 7)
   msg.rs1addr   := inst(19, 15)
   msg.rs2addr   := inst(24, 20)
-  msg.csr_addr  := inst(31, 20)
+  
+  // 对于 ECALL 提取 MTVEC 的地址 0x305； MRET 提取 MEPC 的地址 0x341，否则按普通 csri 取位
+  msg.csr_addr  := Mux(inst === "h00000073".U /* ecall */, "h305".U(12.W), 
+                   Mux(inst === "h30200073".U /* mret */, "h341".U(12.W), inst(31, 20)))
   
   // 逻辑信号向量直接映射
   msg.fuType    := decodedBundle(FuTypeExp)
@@ -103,11 +109,18 @@ class IDU()(implicit p: CoreConfig) extends CoreModule {
   msg.aluOp     := decodedBundle(AluOpExp)
   msg.bruOp     := decodedBundle(BruOpExp)
   msg.csrOp     := decodedBundle(CsrOpExp)
+  msg.mduOp     := decodedBundle(MduOpExp)
   msg.memCmd    := decodedBundle(MemCmdExp)
   msg.memSize   := decodedBundle(MemSizeExp)
   msg.memSign   := decodedBundle(MemSignExp)
-  msg.wbTarget  := decodedBundle(WbTargetExp)
+  val isReadOnlyCsr = (decodedBundle(CsrOpExp) === CsrOp.RS || decodedBundle(CsrOpExp) === CsrOp.RC) && inst(19, 15) === 0.U
+  msg.wbTarget  := Mux(decodedBundle(WbTargetExp) === WbTarget.CSR_REG && isReadOnlyCsr, WbTarget.INT_REG, decodedBundle(WbTargetExp))
   msg.halt      := inst === "h00100073".U // 识别 EBREAK 指令
+
+  // 调试输出
+  when(inst === "h00100073".U) {
+    printf(p"[DE] EBREAK detected! inst=0x${Hexadecimal(inst)}, pc=0x${Hexadecimal(inData.pc)}, halt=${msg.halt}\n")
+  }
 
   // 4. 握手 / 连线逻辑
   if (isSingleCycle) {

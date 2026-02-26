@@ -11,6 +11,7 @@
 #ifdef CONFIG_DIFFTEST
 #include "sEMU/difftest.hpp"
 #endif
+#include "sEMU/utils/colors.hpp"
 
 struct sEMU_Options {
     std::string bin_file;
@@ -52,7 +53,7 @@ sEMU_Options parse_args(int argc, char* argv[]) {
                 }
                 break;
             default:
-                std::cerr << "Unknown argument! Try --help for more information.\n";
+                std::cerr << ANSI_COLOR_RED << "Unknown argument! Try --help for more information.\n" << ANSI_COLOR_RESET;
                 exit(1);
         }
     }
@@ -70,17 +71,20 @@ int main(int argc, char* argv[]) {
     
     // 优先尝试加载 ELF 文件
     if (!options.elf_file.empty()) {
-        std::cout << "Loading ELF image: " << options.elf_file << std::endl;
+        std::cout << ANSI_COLOR_GREEN << "Loading ELF image: " << options.elf_file << ANSI_COLOR_RESET << std::endl;
         has_loader = elf_loader.load(options.elf_file, mem);
-        if (!has_loader) return 1;
+        if (!has_loader) {
+            std::cerr << ANSI_COLOR_RED << "Failed to load ELF image." << ANSI_COLOR_RESET << std::endl;
+            return 1;
+        }
     } 
     // 退化到直接加载二进制 BIN 文件
     else if (!options.bin_file.empty()) {
-        std::cout << "Loading binary image: " << options.bin_file << std::endl;
+        std::cout << ANSI_COLOR_GREEN << "Loading binary image: " << options.bin_file << ANSI_COLOR_RESET << std::endl;
         
         std::ifstream file(options.bin_file, std::ios::binary | std::ios::ate);
         if (!file.is_open()) {
-            std::cerr << "Failed to open image: " << options.bin_file << std::endl;
+            std::cerr << ANSI_COLOR_RED << "Failed to open image: " << options.bin_file << ANSI_COLOR_RESET << std::endl;
             return 1;
         }
         
@@ -93,12 +97,12 @@ int main(int argc, char* argv[]) {
 #ifdef CONFIG_DIFFTEST
             difftest.sync_memory(0x80000000, buffer.data(), size, true);
 #endif
-            std::cout << "Successfully loaded " << size << " bytes into memory." << std::endl;
+            std::cout << ANSI_COLOR_GREEN << "Successfully loaded " << size << " bytes into memory." << ANSI_COLOR_RESET << std::endl;
         }
     } 
     // 没有输入时使用硬编码测试序列
     else {
-        std::cout << "No initialization image specified. Booting with a hardcoded test sequence..." << std::endl;
+        std::cout << ANSI_COLOR_YELLOW << "No initialization image specified. Booting with a hardcoded test sequence..." << ANSI_COLOR_RESET << std::endl;
         mem.mem_init();
 #ifdef CONFIG_DIFFTEST
         // Sync the hardcoded test sequence to REF

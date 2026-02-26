@@ -8,6 +8,7 @@ import sCore.utils._
 // 执行阶段传递给下一级的负载 (EX -> MEM 阶段)
 // -----------------------------------------------------------------------------
 class EX_MEM_Bundle(implicit p: CoreConfig) extends CoreBundle {
+  val inst      = UInt(32.W)        // 透传的原始指令
   val aluOut    = UInt(xlen.W)      // ALU 的计算结果或访存地址
   val rs2Data   = UInt(xlen.W)      // 写内存(Store)时需要透传的原始 rs2 数据
   val pc        = UInt(vaddrBits.W) // 由于分支或跳转，有时需要原PC；或留给异常中断处理
@@ -85,7 +86,8 @@ class EXU()(implicit p: CoreConfig) extends CoreModule {
     Src1Sel.RS1  -> rs1_val,
     Src1Sel.PC   -> inData.pc,
     Src1Sel.ZERO -> 0.U(xlen.W),
-    Src1Sel.UIMM -> uimm
+    Src1Sel.UIMM -> uimm,
+    Src1Sel.CSR_VAL -> csr_val
   ))
 
   // -- 源操作数 2 的仲裁逻辑
@@ -100,12 +102,22 @@ class EXU()(implicit p: CoreConfig) extends CoreModule {
   alu.io.src2   := src2
   alu.io.aluOp  := inData.aluOp
   
+  // 4.5 MDU 端孔对接与计算
+  val mduOut = WireInit(0.U(xlen.W))
+  if (p.hasM) {
+    val mdu = Module(new MDU())
+    mdu.io.src1   := src1
+    mdu.io.src2   := src2
+    mdu.io.mduOp  := inData.mduOp
+    mduOut        := mdu.io.out
+  }
+
   // TODO: 如果之后在 DecodeRules(含AllFields和decodeTable) 及 DecodedMsg 中加入了 isWord 位，此处就可以换成 inData.isWord
   alu.io.isWord := false.B
 
   // 5. 实例化 BRU 处理分支条件和跳转地址 (预留以接入预测失败判定)
   val bru = Module(new BRU())
-  bru.io.rs1_data := rs1_val
+  bru.io.rs1_data := Mux(inData.bruOp === BruOp.ECALL || inData.bruOp === BruOp.MRET, csr_val, rs1_val)
   bru.io.rs2_data := rs2_val
   bru.io.pc       := inData.pc
   bru.io.imm      := inData.imm
@@ -124,8 +136,11 @@ class EXU()(implicit p: CoreConfig) extends CoreModule {
   msgOut := DontCare 
   
   // 新鲜出炉的信息
-  val isCsr = inData.wbTarget === WbTarget.CSR_REG
-  msgOut.aluOut   := Mux(isCsr, csr_val, alu.io.out) // 若为 CSR 读则往下一级输送旧的 CSR 值，使得其得以正常落入通用寄存器
+  val isCsr = inData.fuType === FUType.CSR
+  val isMdu = inData.fuType === FUType.MDU
+  val aluOrMduOut = Mux(isMdu && p.hasM.B, mduOut, alu.io.out)
+  msgOut.inst     := inData.inst
+  msgOut.aluOut   := Mux(isCsr, csr_val, aluOrMduOut) // 若为 CSR 读则往下一级输送旧的 CSR 值，使得其得以正常落入通用寄存器
   msgOut.rs2Data  := rs2_val  // 必须把原汁原味的 rs2 读出来送去给 Store 使用
   msgOut.pc       := inData.pc
   

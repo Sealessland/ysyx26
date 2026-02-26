@@ -23,10 +23,11 @@ case class CoreConfig(
   paddrBits: Int = 32,        // 物理地址位宽
   hasFPU: Boolean = false,     // 是否包含浮点单元 (F extension)
   hasRVC: Boolean = false,     // 是否支持压缩指令 (C extension)
-  hasM: Boolean = true,        // 是否支持乘除法扩展 (M extension)
+  hasM: Boolean = false,       // 是否支持乘除法扩展 (M extension)
   hasA: Boolean = false,       // 是否支持原子指令扩展 (A extension)
   hasZicsr: Boolean = true,    // 是否支持 CSR 指令
-  isSingleCycle: Boolean = false, // 是否为单周期设计 (验证用)
+  fastMdu: Boolean = true,     // 是否使用单周期组合逻辑乘除法单元
+  isSingleCycle: Boolean = true, // 是否为单周期设计 (验证用)
   frontend: FrontendConfig = FrontendConfig(),
   lsu: LsuConfig = LsuConfig()
 ) {
@@ -51,6 +52,7 @@ trait HasCoreParams {
   val hasM          = p.hasM
   val hasA          = p.hasA
   val hasZicsr      = p.hasZicsr
+  val fastMdu       = p.fastMdu
   val isSingleCycle = p.isSingleCycle
   
   // 衍生参数计算，一处定义，到处使用

@@ -12,7 +12,12 @@ object Elaborate extends App {
     ).reduce(_ + "," + _)
   )
 
-  implicit val config: CoreConfig = CoreConfig(isSingleCycle = true)
+  implicit val config: CoreConfig = CoreConfig(
+    isSingleCycle = true,
+    hasM = true,
+    fastMdu = true,
+    hasZicsr = true
+  )
 
   // 2. 生成主要模块的Verilog代码
   circt.stage.ChiselStage.emitSystemVerilogFile(new CoreTop(), args, firtoolOptions)

@@ -11,8 +11,16 @@ class WBUIO(implicit p: CoreConfig) extends CoreBundle {
   val in  = Flipped(if (isSingleCycle) new MEM_WB_Bundle else Decoupled(new MEM_WB_Bundle))
   
   // WB 的最后阶段需要给出暴露在外的测试引脚：当前提交的这一条操作的结果状态
-  val wb_pc    = Output(UInt(vaddrBits.W))
-  val wb_valid = Output(Bool())    // 表明是否在此刻有效提交
+  val wb_pc        = Output(UInt(vaddrBits.W))
+  val wb_valid     = Output(Bool())    // 表明是否在此刻有效提交
+  val wb_inst      = Output(UInt(32.W))
+  val wb_is_store  = Output(Bool())
+  val wb_halt      = Output(Bool())
+  
+  // 异常处理与 CSR 状态维护的专用输出
+  val wb_exception = Output(Bool())
+  val wb_epc       = Output(UInt(vaddrBits.W))
+  val wb_cause     = Output(UInt(xlen.W))
   
   val rf_waddr = Output(UInt(5.W))
   val rf_wdata = Output(UInt(xlen.W))
@@ -36,8 +44,11 @@ class WBU()(implicit p: CoreConfig) extends CoreModule {
   val inData  = if (isSingleCycle) io.in.asInstanceOf[MEM_WB_Bundle] else io.in.asInstanceOf[DecoupledIO[MEM_WB_Bundle]].bits
 
   // 对外暴露当前的 PC 以供比对测试和跟踪 (Commit Log)
-  io.wb_pc    := inData.pc
-  io.wb_valid := inValid
+  io.wb_pc        := inData.pc
+  io.wb_valid     := inValid
+  io.wb_inst      := inData.inst
+  io.wb_is_store  := (inData.memCmd === MemCmd.WRITE)
+  io.wb_halt      := inData.halt
   
   // 决定最终要写什么进通用寄存器
   // CSR 指令同时也需要向通用整数寄存器中写入旧的 CSR 值
@@ -59,6 +70,18 @@ class WBU()(implicit p: CoreConfig) extends CoreModule {
   val dpicEbreak = Module(new DPIC_Ebreak())
   dpicEbreak.io.clk := clock
   dpicEbreak.io.en  := inValid && inData.halt
+
+  // 抛出异常信号给到外部 CSRFile
+  // ecall 指令特征：它是 SYS 系统的例外指令 (在我们的解码矩阵中，ecall 的 imm被赋作了类似I-type, inst形如 h00000073)
+  val isEcall = inData.inst === "h00000073".U
+  io.wb_exception := inValid && isEcall
+  io.wb_epc       := inData.pc
+  io.wb_cause     := 0xb.U // Machine call cause
+
+  // 调试输出
+  when(inData.halt) {
+    printf(p"[WBU] halt signal detected! inValid=$inValid, pc=0x${Hexadecimal(inData.pc)}\n")
+  }
   
   // 若流水线解耦模式下，WBU 位于最末端，永远接收
   if (!isSingleCycle) {

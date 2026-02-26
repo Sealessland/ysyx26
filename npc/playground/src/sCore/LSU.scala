@@ -8,6 +8,7 @@ import sCore.utils._
 // 传递给写回级 (WB) 的负载信息
 // -----------------------------------------------------------------------------
 class MEM_WB_Bundle(implicit p: CoreConfig) extends CoreBundle {
+  val inst      = UInt(32.W)        // 透传的原始指令
   val rfData    = UInt(xlen.W)      // 将要写回通用寄存器的数据
   val pc        = UInt(vaddrBits.W) // 顺着流水线传下来的原 PC (可供测试观测)
   
@@ -21,6 +22,9 @@ class MEM_WB_Bundle(implicit p: CoreConfig) extends CoreBundle {
   val csrWdata  = UInt(xlen.W)
   val csrAddr   = UInt(12.W)
   val csrOp     = CsrOp()
+  
+  // 访存状态标志透传，供 WBU 输出 `wb_is_store` 标志
+  val memCmd    = MemCmd()
 }
 
 // -----------------------------------------------------------------------------
@@ -148,6 +152,7 @@ class LSU()(implicit p: CoreConfig) extends CoreModule {
   // 4. 重组前往 WB 的数据负载
   val msgOut = Wire(new MEM_WB_Bundle)
   msgOut          := DontCare
+  msgOut.inst     := inData.inst
   msgOut.rfData   := rfData
   msgOut.pc       := inData.pc
   msgOut.rdaddr   := inData.rdaddr
@@ -157,6 +162,8 @@ class LSU()(implicit p: CoreConfig) extends CoreModule {
   msgOut.csrWdata := inData.csrWdata
   msgOut.csrAddr  := inData.csrAddr
   msgOut.csrOp    := inData.csrOp
+  
+  msgOut.memCmd   := inData.memCmd
 
   // 5. 连接输出级
   if (isSingleCycle) {

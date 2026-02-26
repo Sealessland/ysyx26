@@ -9,14 +9,21 @@ import sCore.utils._
 class CoreTop()(implicit p: CoreConfig) extends Module {
   // 定义顶层观察与测试的 IO：将对 Commit（指令提交状态）的追踪信号引出
   val io = IO(new Bundle {
-    val commit_pc    = Output(UInt(p.vaddrBits.W))
-    val commit_valid = Output(Bool())
+    val commit_pc      = Output(UInt(p.vaddrBits.W))
+    val commit_inst    = Output(UInt(32.W))
+    val commit_valid   = Output(Bool())
+    val commit_is_store= Output(Bool())
+    val commit_halt    = Output(Bool())
     
     // GPR 监控探针
-    val commit_rd    = Output(UInt(5.W))
-    val commit_wdata = Output(UInt(p.xlen.W))
-    val commit_wen   = Output(Bool())
+    val commit_rd      = Output(UInt(5.W))
+    val commit_wdata   = Output(UInt(p.xlen.W))
+    val commit_wen     = Output(Bool())
     
+    // CSR 监控探针
+    val commit_csr_waddr = Output(UInt(12.W))
+    val commit_csr_wdata = Output(UInt(p.xlen.W))
+    val commit_csr_wen   = Output(Bool())
   })
 
   // ================= 1. 实例化核心组件 =================
@@ -60,10 +67,10 @@ class CoreTop()(implicit p: CoreConfig) extends Module {
     csr.io.csr_wen   := wbu.io.csr_wen
     csr.io.csr_op    := wbu.io.csr_op
     
-    // 尚未处理异常和特权相关的接口，先写死 0
-    csr.io.exception := false.B
-    csr.io.epc       := 0.U
-    csr.io.cause     := 0.U
+    // 接入由写回阶段解析发出的异常与特权相关接口
+    csr.io.exception := wbu.io.wb_exception
+    csr.io.epc       := wbu.io.wb_epc
+    csr.io.cause     := wbu.io.wb_cause
   } else {
     exu.io.csr_data := 0.U
   }
@@ -106,22 +113,23 @@ class CoreTop()(implicit p: CoreConfig) extends Module {
   }
 
   // ================= 4. 测试与观察层投射 =================
-  io.commit_pc    := wbu.io.wb_pc
-  io.commit_valid := wbu.io.wb_valid
+  io.commit_pc       := wbu.io.wb_pc
+  io.commit_inst     := wbu.io.wb_inst
+  io.commit_valid    := wbu.io.wb_valid
+  io.commit_is_store := wbu.io.wb_is_store
+  io.commit_halt     := wbu.io.wb_halt
   
-  io.commit_rd    := wbu.io.rf_waddr
-  io.commit_wdata := wbu.io.rf_wdata
-  io.commit_wen   := wbu.io.rf_wen
+  io.commit_rd       := wbu.io.rf_waddr
+  io.commit_wdata    := wbu.io.rf_wdata
+  io.commit_wen      := wbu.io.rf_wen
+  
   if (p.hasZicsr) {
-    // 仅在参数化开启时，在顶层动态附加生成用于 DPI/Verilator 监控的探针端口
-    val probe_csr_waddr = IO(Output(Probe(UInt(12.W))))
-    val probe_csr_wdata = IO(Output(Probe(UInt(p.xlen.W))))
-    val probe_csr_wen   = IO(Output(Probe(Bool())))
-    val probe_csr_op    = IO(Output(Probe(CsrOp())))
-
-    define(probe_csr_waddr, ProbeValue(wbu.io.csr_waddr))
-    define(probe_csr_wdata, ProbeValue(wbu.io.csr_wdata))
-    define(probe_csr_wen,   ProbeValue(wbu.io.csr_wen))
-    define(probe_csr_op,    ProbeValue(wbu.io.csr_op))
+    io.commit_csr_waddr := wbu.io.csr_waddr
+    io.commit_csr_wdata := wbu.io.csr_wdata
+    io.commit_csr_wen   := wbu.io.csr_wen
+  } else {
+    io.commit_csr_waddr := 0.U
+    io.commit_csr_wdata := 0.U
+    io.commit_csr_wen   := false.B
   }
 }
