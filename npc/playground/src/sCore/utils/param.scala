@@ -35,6 +35,14 @@ case class CoreConfig(
   // 可以利用 require 做参数的编译期合法性检查
   require(xlen == 32 || xlen == 64, "XLEN must be 32 or 64")
   require(frontend.fetchWidth >= 1 && frontend.fetchWidth <= 8, "Fetch width must be bounded")
+  require(
+    Set("dpi", "sramLite", "sram", "cache", "axiLite").contains(frontend.fetchMode),
+    s"Unknown fetch mode: ${frontend.fetchMode}"
+  )
+  require(
+    Set("dpi", "axiLite", "axi4", "cache").contains(lsu.lsuMode),
+    s"Unknown LSU mode: ${lsu.lsuMode}"
+  )
 }
 
 // -----------------------------------------------------------------------------
