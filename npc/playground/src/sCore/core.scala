@@ -24,6 +24,10 @@ class CoreTop()(implicit p: CoreConfig) extends Module {
     val commit_csr_waddr = Output(UInt(12.W))
     val commit_csr_wdata = Output(UInt(p.xlen.W))
     val commit_csr_wen   = Output(Bool())
+
+    // AXI-Lite 主机端口（取指 + 访存共享）
+    val axi = if (p.frontend.fetchMode == "axiLite" || p.lsu.lsuMode == "axiLite" || p.lsu.lsuMode == "axi4")
+      Some(new AxiLiteMasterIO(p.paddrBits, p.xlen)) else None
   })
 
   // ================= 1. 实例化核心组件 =================
@@ -34,6 +38,20 @@ class CoreTop()(implicit p: CoreConfig) extends Module {
   val wbu     = Module(new WBU())
   val regfile = Module(new RegFile())
   val csrfile = if (p.hasZicsr) Some(Module(new CSRFile())) else None
+
+  // ================= 1.5. 外部存储接口仲裁 =================
+  if (io.axi.isDefined) {
+    if (ifu.io.axi.isDefined && lsu.io.axi.isDefined) {
+      val arb = Module(new AxiLiteArbiter(p.paddrBits, p.xlen, preferSecond = true))
+      arb.io.in0 <> ifu.io.axi.get
+      arb.io.in1 <> lsu.io.axi.get
+      io.axi.get <> arb.io.out
+    } else if (ifu.io.axi.isDefined) {
+      io.axi.get <> ifu.io.axi.get
+    } else if (lsu.io.axi.isDefined) {
+      io.axi.get <> lsu.io.axi.get
+    }
+  }
 
   // ================= 2. 静态/纯直通内部连线 =================
   
@@ -99,79 +117,57 @@ class CoreTop()(implicit p: CoreConfig) extends Module {
     
   } else if (p.isMultiCycle) {
     // -------------------------------------------------------------
-    // 多周期握手模式 (简易版)：只有当 WBU 提交完成时，才允许 IFU 取下一条
+    // 多周期握手模式：全程仅允许 1 条在途指令
+    // 规则：IF 只有在 WB 提交完成后才允许取下一条
     // -------------------------------------------------------------
-    
+
     // 令牌：是否允许取新指令
     val allowFetch = RegInit(true.B)
-    
-    // 队列充当级联缓存 (Pipeline Registers)
-    // 禁用 pipe=true 使得 Queue 真正发挥锁存一拍的作用，形成阶梯流水流转
-    val if_id_q = Module(new Queue(new IF_ID_Bundle, 1))
-    val id_ex_q = Module(new Queue(new DecodedMsg, 1))
-    val ex_mem_q= Module(new Queue(new EX_MEM_Bundle, 1))
-    val mem_wb_q= Module(new Queue(new MEM_WB_Bundle, 1))
 
-    // 绑定内部 Queue 冲刷接口 (检测异常或跳转清空级联状态)
-    // 多周期模式下只允许 1 条在途指令，重定向时不应清除“当前”指令本身，
-    // 否则会丢失 commit（例如 JAL 被 flush 掉，导致提交序列缺失）。
-    // 因此只清空前端级（IF/ID、ID/EX），保留后端级的在途指令。
-    val flushFront = ifu.io.redirectEX.valid || ifu.io.redirectWB.valid
-    if_id_q.reset  := reset.asBool || flushFront
-    id_ex_q.reset  := reset.asBool || flushFront
+    // 队列充当级联缓存 (Pipeline Registers)
+    // 明确关闭 pipe/flow，避免空队列时的 bypass 直通
+    val if_id_q  = Module(new Queue(new IF_ID_Bundle, 1, pipe = false, flow = false))
+    val id_ex_q  = Module(new Queue(new DecodedMsg, 1, pipe = false, flow = false))
+    val ex_mem_q = Module(new Queue(new EX_MEM_Bundle, 1, pipe = false, flow = false))
+    val mem_wb_q = Module(new Queue(new MEM_WB_Bundle, 1, pipe = false, flow = false))
+
+    // 绑定内部 Queue 冲刷接口
+    // 多周期只允许 1 条在途，重定向时不能清掉“当前指令本体”，否则会丢 commit
+    val frontFlush = ifu.io.redirectEX.valid || ifu.io.redirectWB.valid
+    if_id_q.reset  := reset.asBool || frontFlush
+    id_ex_q.reset  := reset.asBool || frontFlush
     ex_mem_q.reset := reset.asBool
     mem_wb_q.reset := reset.asBool
 
     // -------- [ 发射控制 ] --------
-    // 拦截 IFU 发出的握手请求，当不允许取指时，强制屏蔽它的 valid，使其在这拍堵塞
     val ifuOut = ifu.io.nextStage.get
     if_id_q.io.enq.valid := ifuOut.valid && allowFetch
     if_id_q.io.enq.bits  := ifuOut.bits
-    
-    // 仅在允许发射且队列接收时，IFU 才被认为是真正“发出去”了
     ifuOut.ready         := if_id_q.io.enq.ready && allowFetch
 
     // -------- [ 级间队列连线 ] --------
-    // ID 阶
     val iduInDec = idu.io.in.asInstanceOf[DecoupledIO[IF_ID_Bundle]]
     iduInDec <> if_id_q.io.deq
-    
     id_ex_q.io.enq <> idu.io.out.asInstanceOf[DecoupledIO[DecodedMsg]]
 
-    // EX 阶
     val exuInDec = exu.io.in.asInstanceOf[DecoupledIO[DecodedMsg]]
     exuInDec <> id_ex_q.io.deq
-    
     ex_mem_q.io.enq <> exu.io.out.asInstanceOf[DecoupledIO[EX_MEM_Bundle]]
 
-    // MEM(LSU) 阶
     val lsuInDec = lsu.io.in.asInstanceOf[DecoupledIO[EX_MEM_Bundle]]
     lsuInDec <> ex_mem_q.io.deq
-    
     mem_wb_q.io.enq <> lsu.io.out.asInstanceOf[DecoupledIO[MEM_WB_Bundle]]
 
-    // WB 阶
     val wbuInDec = wbu.io.in.asInstanceOf[DecoupledIO[MEM_WB_Bundle]]
     wbuInDec <> mem_wb_q.io.deq
 
-    // -----------------------------------------------------------------------
-    // 令牌状态机（修复版）
-    //
-    // Bug 根源：Chisel Queue(T,1) 空队列时允许 enq/deq 在同一拍 fire（zero-
-    // latency bypass），且各级 inDec.ready := outDec.ready 组合穿透。这导致：
-    // 1. 发指令（if_id_q.enq.fire）与 WBU 接收（wbuInDec.fire）同拍成立
-    // 2. 原来两个独立 when 块中 Chisel 语义「后者覆盖前者」：
-    //      when(enq.fire)  { allowFetch := false.B }  // 先
-    //      when(wbu.fire)  { allowFetch := true.B  }  // 后 → 覆盖 → 令牌永不丢失
-    //
-    // 修复：改用 when-elsewhen，保证「没收」拥有最高优先级，
-    // 发射新指令的那一拍，归还动作绝对不会同时生效。
-    // -----------------------------------------------------------------------
-    when(if_id_q.io.enq.fire) {
-      // 最高优先级：IFU 在此拍成功发射了一条指令 → 没收令牌
+    // -------- [ 令牌状态机 ] --------
+    // 发射与提交可能同拍，必须让“发射”优先级更高
+    val issueFire  = if_id_q.io.enq.fire
+    val commitFire = wbuInDec.fire
+    when(issueFire) {
       allowFetch := false.B
-    } .elsewhen(wbuInDec.fire) {
-      // 仅当本拍没有同时发射新指令时，才归还令牌（或 flush 清空流水线时复位）
+    } .elsewhen(commitFire) {
       allowFetch := true.B
     }
   } else {

@@ -9,11 +9,11 @@ case class FrontendConfig(
   fetchWidth: Int = 1,
   btbEntries: Int = 32,
   bpdType: String = "NONE",
-  fetchMode: String = "dpi" // "dpi", "sramLite", "sram", "cache"
+  fetchMode: String = "dpi" // "dpi", "sramLite", "sram", "cache", "axiLite"
 )
 
 case class LsuConfig(
-  lsuMode: String = "dpi" // "dpi", "axiLite", "axi4", "cache"
+  lsuMode: String = "dpi" // "dpi", "axiLite", "axi4"(single-beat via AXI-Lite), "cache"
 )
 
 
@@ -70,4 +70,3 @@ abstract class CoreModule(implicit val p: CoreConfig) extends Module with HasCor
 
 /** 所有 CPU 内部 Bundle 的基类，例如 IO 接口 */
 abstract class CoreBundle(implicit val p: CoreConfig) extends Bundle with HasCoreParams
-
