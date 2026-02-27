@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 namespace {
@@ -30,6 +31,31 @@ size_t g_pmem_write_count = 0;
 size_t g_pmem_oob_count = 0;
 size_t g_pmem_len_error = 0;
 size_t g_paddr_oob_count = 0;
+size_t g_axi_ar_count = 0;
+size_t g_axi_aw_count = 0;
+size_t g_axi_w_count = 0;
+size_t g_axi_r_count = 0;
+size_t g_axi_b_count = 0;
+
+template <typename T, typename = void>
+struct has_axi : std::false_type {};
+
+template <typename T>
+struct has_axi<T, std::void_t<decltype(std::declval<T>().io_axi_aw_valid)>>
+    : std::true_type {};
+
+struct AxiLiteSlave {
+  bool aw_pending = false;
+  bool w_pending = false;
+  uint32_t aw_addr = 0;
+  uint32_t w_data = 0;
+  uint8_t w_strb = 0;
+  bool b_valid = false;
+  bool r_valid = false;
+  uint32_t r_data = 0;
+};
+
+AxiLiteSlave g_axi;
 
 inline bool addr_in_range(uint32_t addr) {
   return addr >= kBase && (addr - kBase) < g_mem.size();
@@ -806,14 +832,93 @@ void eval_high(VCoreTop *top, VerilatedContext *ctx, VerilatedVcdC *tfp) {
   ctx->timeInc(1);
 }
 
-bool check_bus_activity(bool require_fetch, bool print_stats) {
-  if (print_stats) {
-    std::fprintf(stderr,
-                 "BUS: fetch=%zu load=%zu store=%zu oob_paddr=%zu oob_pmem=%zu len_err=%zu\n",
-                 g_paddr_read_count, g_pmem_read_count, g_pmem_write_count,
-                 g_paddr_oob_count, g_pmem_oob_count, g_pmem_len_error);
+template <typename T>
+void axi_drive(T *top, AxiLiteSlave &axi) {
+  if constexpr (has_axi<T>::value) {
+    const bool busy = axi.b_valid || axi.r_valid || axi.aw_pending || axi.w_pending;
+    top->io_axi_aw_ready = busy ? 0 : 1;
+    top->io_axi_w_ready = busy ? 0 : 1;
+    top->io_axi_ar_ready = busy ? 0 : 1;
+
+    top->io_axi_b_valid = axi.b_valid ? 1 : 0;
+    top->io_axi_b_bits_resp = 0;
+    top->io_axi_r_valid = axi.r_valid ? 1 : 0;
+    top->io_axi_r_bits_resp = 0;
+    top->io_axi_r_bits_data = axi.r_data;
   }
-  if (require_fetch && g_paddr_read_count == 0) {
+}
+
+template <typename T>
+void axi_tick(T *top, AxiLiteSlave &axi) {
+  if constexpr (has_axi<T>::value) {
+    const bool aw_fire = top->io_axi_aw_valid && top->io_axi_aw_ready;
+    const bool w_fire = top->io_axi_w_valid && top->io_axi_w_ready;
+    const bool ar_fire = top->io_axi_ar_valid && top->io_axi_ar_ready;
+    const bool b_fire = top->io_axi_b_valid && top->io_axi_b_ready;
+    const bool r_fire = top->io_axi_r_valid && top->io_axi_r_ready;
+
+    if (aw_fire) {
+      axi.aw_pending = true;
+      axi.aw_addr = top->io_axi_aw_bits_addr;
+      g_axi_aw_count++;
+    }
+    if (w_fire) {
+      axi.w_pending = true;
+      axi.w_data = top->io_axi_w_bits_data;
+      axi.w_strb = static_cast<uint8_t>(top->io_axi_w_bits_strb);
+      g_axi_w_count++;
+    }
+    if (!axi.b_valid && axi.aw_pending && axi.w_pending) {
+      const uint32_t base = axi.aw_addr;
+      for (uint32_t i = 0; i < 4; ++i) {
+        if (axi.w_strb & (1u << i)) {
+          mem_write(base + i, (axi.w_data >> (8 * i)) & 0xffu, 1);
+        }
+      }
+      axi.aw_pending = false;
+      axi.w_pending = false;
+      axi.b_valid = true;
+    }
+    if (b_fire) {
+      axi.b_valid = false;
+      g_axi_b_count++;
+    }
+
+    if (ar_fire && !axi.r_valid) {
+      axi.r_data = mem_read32_aligned(top->io_axi_ar_bits_addr);
+      axi.r_valid = true;
+      g_axi_ar_count++;
+    }
+    if (r_fire) {
+      axi.r_valid = false;
+      g_axi_r_count++;
+    }
+  }
+}
+
+template <typename T>
+bool check_bus_activity(T *top, bool require_fetch, bool print_stats) {
+  size_t fetch_count = g_paddr_read_count;
+  if constexpr (has_axi<T>::value) {
+    fetch_count += g_axi_ar_count;
+  }
+  if (print_stats) {
+    if constexpr (has_axi<T>::value) {
+      std::fprintf(stderr,
+                   "BUS: fetch=%zu load=%zu store=%zu oob_paddr=%zu oob_pmem=%zu len_err=%zu "
+                   "axi_ar=%zu axi_aw=%zu axi_w=%zu axi_r=%zu axi_b=%zu\n",
+                   g_paddr_read_count, g_pmem_read_count, g_pmem_write_count,
+                   g_paddr_oob_count, g_pmem_oob_count, g_pmem_len_error,
+                   g_axi_ar_count, g_axi_aw_count, g_axi_w_count, g_axi_r_count,
+                   g_axi_b_count);
+    } else {
+      std::fprintf(stderr,
+                   "BUS: fetch=%zu load=%zu store=%zu oob_paddr=%zu oob_pmem=%zu len_err=%zu\n",
+                   g_paddr_read_count, g_pmem_read_count, g_pmem_write_count,
+                   g_paddr_oob_count, g_pmem_oob_count, g_pmem_len_error);
+    }
+  }
+  if (require_fetch && fetch_count == 0) {
     std::fprintf(stderr, "No instruction fetch activity observed.\n");
     return false;
   }
@@ -957,6 +1062,12 @@ int main(int argc, char **argv) {
   g_pmem_oob_count = 0;
   g_pmem_len_error = 0;
   g_paddr_oob_count = 0;
+  g_axi_ar_count = 0;
+  g_axi_aw_count = 0;
+  g_axi_w_count = 0;
+  g_axi_r_count = 0;
+  g_axi_b_count = 0;
+  g_axi = AxiLiteSlave();
 
   if (!use_binary) {
     auto inst_at_pc = [&](uint32_t pc) -> uint32_t {
@@ -974,6 +1085,7 @@ int main(int argc, char **argv) {
                                   : expected.size() + 50;
 
     for (size_t cycles = 0; cycles < max_cycles; ++cycles) {
+      axi_drive(top.get(), g_axi);
       eval_low(top.get(), &ctx, tfp_ptr);
       const uint32_t pc = top->io_commit_pc;
       const bool wen = top->io_commit_wen != 0;
@@ -1034,6 +1146,7 @@ int main(int argc, char **argv) {
       }
 
       eval_high(top.get(), &ctx, tfp_ptr);
+      axi_tick(top.get(), g_axi);
       if (g_ebreak_called) {
         break;
       }
@@ -1061,7 +1174,7 @@ int main(int argc, char **argv) {
       std::fprintf(stderr, "Verification failed with %d errors.\n", errors);
       return 1;
     }
-    if (!check_bus_activity(true, true)) {
+    if (!check_bus_activity(top.get(), true, true)) {
       return 1;
     }
 
@@ -1080,6 +1193,7 @@ int main(int argc, char **argv) {
 
   for (size_t cycles = 0; cycles < max_cycles; ++cycles) {
     cycles_run = cycles + 1;
+    axi_drive(top.get(), g_axi);
     eval_low(top.get(), &ctx, tfp_ptr);
     uint32_t pc = top->io_commit_pc;
     if (!started) {
@@ -1100,6 +1214,7 @@ int main(int argc, char **argv) {
     }
 
     eval_high(top.get(), &ctx, tfp_ptr);
+    axi_tick(top.get(), g_axi);
     if (g_ebreak_called) {
       break;
     }
@@ -1122,7 +1237,7 @@ int main(int argc, char **argv) {
     std::fprintf(stderr, "Ebreak was not observed.\n");
     return 1;
   }
-  if (!check_bus_activity(true, true)) {
+  if (!check_bus_activity(top.get(), true, true)) {
     return 1;
   }
   return 0;
