@@ -835,10 +835,9 @@ void eval_high(VCoreTop *top, VerilatedContext *ctx, VerilatedVcdC *tfp) {
 template <typename T>
 void axi_drive(T *top, AxiLiteSlave &axi) {
   if constexpr (has_axi<T>::value) {
-    const bool busy = axi.b_valid || axi.r_valid || axi.aw_pending || axi.w_pending;
-    top->io_axi_aw_ready = busy ? 0 : 1;
-    top->io_axi_w_ready = busy ? 0 : 1;
-    top->io_axi_ar_ready = busy ? 0 : 1;
+    top->io_axi_aw_ready = (!axi.aw_pending && !axi.b_valid) ? 1 : 0;
+    top->io_axi_w_ready = (!axi.w_pending && !axi.b_valid) ? 1 : 0;
+    top->io_axi_ar_ready = (!axi.r_valid) ? 1 : 0;
 
     top->io_axi_b_valid = axi.b_valid ? 1 : 0;
     top->io_axi_b_bits_resp = 0;
