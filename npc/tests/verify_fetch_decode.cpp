@@ -920,7 +920,9 @@ int main(int argc, char **argv) {
     size_t idx = 0;
     bool started = false;
     int errors = 0;
-    const size_t max_cycles = expected.size() + 50;
+    const size_t max_cycles = max_cycles_override
+                                  ? max_cycles_override
+                                  : expected.size() + 50;
 
     for (size_t cycles = 0; cycles < max_cycles; ++cycles) {
       eval_low(top.get(), &ctx, tfp_ptr);

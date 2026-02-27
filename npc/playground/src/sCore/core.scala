@@ -113,12 +113,14 @@ class CoreTop()(implicit p: CoreConfig) extends Module {
     val mem_wb_q= Module(new Queue(new MEM_WB_Bundle, 1))
 
     // 绑定内部 Queue 冲刷接口 (检测异常或跳转清空级联状态)
-    // 只要有任何针对 IFU 的重新定向，说明原本在流水线飘逸中的指令作废
-    val flush = ifu.io.redirectEX.valid || ifu.io.redirectWB.valid
-    if_id_q.reset  := reset.asBool || flush
-    id_ex_q.reset  := reset.asBool || flush
-    ex_mem_q.reset := reset.asBool || flush
-    mem_wb_q.reset := reset.asBool || flush
+    // 多周期模式下只允许 1 条在途指令，重定向时不应清除“当前”指令本身，
+    // 否则会丢失 commit（例如 JAL 被 flush 掉，导致提交序列缺失）。
+    // 因此只清空前端级（IF/ID、ID/EX），保留后端级的在途指令。
+    val flushFront = ifu.io.redirectEX.valid || ifu.io.redirectWB.valid
+    if_id_q.reset  := reset.asBool || flushFront
+    id_ex_q.reset  := reset.asBool || flushFront
+    ex_mem_q.reset := reset.asBool
+    mem_wb_q.reset := reset.asBool
 
     // -------- [ 发射控制 ] --------
     // 拦截 IFU 发出的握手请求，当不允许取指时，强制屏蔽它的 valid，使其在这拍堵塞
@@ -168,7 +170,7 @@ class CoreTop()(implicit p: CoreConfig) extends Module {
     when(if_id_q.io.enq.fire) {
       // 最高优先级：IFU 在此拍成功发射了一条指令 → 没收令牌
       allowFetch := false.B
-    } .elsewhen(wbuInDec.fire || flush) {
+    } .elsewhen(wbuInDec.fire) {
       // 仅当本拍没有同时发射新指令时，才归还令牌（或 flush 清空流水线时复位）
       allowFetch := true.B
     }
