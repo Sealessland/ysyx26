@@ -20,6 +20,7 @@ class MemReadIO(val addrBits: Int, val dataBits: Int) extends Bundle {
 class FetchUnit()(implicit p: CoreConfig) extends CoreModule {
   val io = IO(new Bundle {
     val mem = Flipped(new MemReadIO(p.paddrBits, 32)) 
+    val axi = if (p.frontend.fetchMode == "axiLite") Some(new AxiLiteMasterIO(p.paddrBits, p.xlen)) else None
   })
 
   // 高扩展性路由：根据配置项，动态生成真正综合到底层的硬件！
@@ -53,8 +54,57 @@ class FetchUnit()(implicit p: CoreConfig) extends CoreModule {
       io.mem.resp.valid := false.B
       io.mem.resp.bits.data := 0.U
       
+    case "axiLite" =>
+      // 5. AXI4-Lite 取指（单 in-flight）
+      val axi = io.axi.get
+      val busBytes = (p.xlen / 8)
+      val byteOffBits = log2Ceil(busBytes)
+      val addrAlignMask = Cat(Fill(p.paddrBits - byteOffBits, 1.U), 0.U(byteOffBits.W))
+
+      val sIdle :: sAddr :: sWait :: sResp :: Nil = Enum(4)
+      val state = RegInit(sIdle)
+      val addrReg = Reg(UInt(p.paddrBits.W))
+      val instReg = Reg(UInt(32.W))
+      val respValid = RegInit(false.B)
+
+      io.mem.req.ready := (state === sIdle) && !respValid
+      when(io.mem.req.fire) {
+        addrReg := io.mem.req.bits.addr
+        state := sAddr
+      }
+
+      axi.aw.valid := false.B
+      axi.w.valid  := false.B
+      axi.b.ready  := false.B
+      axi.aw.bits.addr := 0.U
+      axi.aw.bits.prot := 0.U
+      axi.w.bits.data  := 0.U
+      axi.w.bits.strb  := 0.U
+
+      axi.ar.valid := (state === sAddr)
+      axi.ar.bits.addr := addrReg & addrAlignMask
+      axi.ar.bits.prot := 0.U
+
+      axi.r.ready := (state === sWait)
+      when(state === sAddr && axi.ar.fire) {
+        state := sWait
+      }
+      when(state === sWait && axi.r.fire) {
+        val shift = (addrReg(byteOffBits - 1, 0) << 3).asUInt
+        instReg := (axi.r.bits.data >> shift)(31, 0)
+        respValid := true.B
+        state := sResp
+      }
+
+      io.mem.resp.valid := respValid
+      io.mem.resp.bits.data := instReg
+      when(io.mem.resp.fire) {
+        respValid := false.B
+        state := sIdle
+      }
+
     case _ =>
-      require(false, s"Unknown fetch mode: ${p.frontend.fetchMode}. Must be one of: dpi, sramLite, sram, cache")
+      require(false, s"Unknown fetch mode: ${p.frontend.fetchMode}. Must be one of: dpi, sramLite, sram, cache, axiLite")
   }
 }
 
