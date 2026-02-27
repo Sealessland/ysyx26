@@ -37,7 +37,7 @@ build-sim: $(VERIFY_TEST) $(BUILD_DIR)/filelist.f
 		$(VERILATOR) $(VERILATOR_FLAGS) -Mdir verilator -o sim -f filelist.f ../$(VERIFY_TEST)
 
 verify: build-sim
-	./$(VERIFY_DIR)/sim --bin build/build/rtthread-riscv32e-npc.bin --max-cycles 20000000 --no-trace --require-ebreak
+	./$(VERIFY_DIR)/sim --bin build/build/rtthread-riscv32e-npc.bin --max-cycles 20000000  --require-ebreak
 
 run: build-sim
 	./$(VERIFY_DIR)/sim --bin $(BIN) --max-cycles 20000000 --no-trace --require-ebreak

@@ -4,6 +4,7 @@
 #include "VCoreTop___024root.h"
 #include "VCoreTop__Dpi.h"
 #include "verilated.h"
+#include "verilated_vcd_c.h"  // VCD trace 支持
 #include <iostream>
 #include <iomanip>
 #include <cstdlib>
@@ -89,25 +90,103 @@ extern "C" {
     }
 }
 
-Core::Core(guest_mem* mem_instance) 
+Core::Core(guest_mem* mem_instance, const std::string& vcd_path)
     : contextp(std::make_unique<VerilatedContext>()),
       top(std::make_unique<VCoreTop>(contextp.get())),
       state(CoreState::STOPPED)
 {
     p_mem = mem_instance;
     p_core = this;
+
+    // 若要录波形，traceEverOn 必须在首次 eval 前调用
+    if (!vcd_path.empty()) {
+        contextp->traceEverOn(true);
+    }
+
     // 初始化引脚状态
     top->clock = 0;
     top->reset = 0;
     eval();
+
+    // 首次 eval 后再 attach trace，确保内部数据结构已初始化
+    if (!vcd_path.empty()) {
+        tfp_ = new VerilatedVcdC;
+        top->trace(tfp_, 0);
+        tfp_->open(vcd_path.c_str());
+        if (!tfp_->isOpen()) {
+            std::cerr << "[Trace] 无法打开 VCD 文件: " << vcd_path << std::endl;
+            delete tfp_;
+            tfp_ = nullptr;
+        } else {
+            // 文件就绪，但默认处于暂停——需要 trace_start() 才开始写入
+            std::cout << "[Trace] 波形就绪（暂停）：" << vcd_path
+                      << "  输入 'wave start' 开始录制" << std::endl;
+            // trace_enabled_ 保持 false
+        }
+    }
 }
 
 Core::~Core() {
+    close_trace(); // 确保析构时刷新并关闭波形文件
     top->final();
+}
+
+void Core::open_trace(const std::string& vcd_path, int depth) {
+    if (tfp_) {
+        std::cerr << "[Trace] 波形文件已经打开，请先 close_trace()" << std::endl;
+        return;
+    }
+    // 如果 traceEverOn 未在构造时设置，这里作为兼容尝试
+    contextp->traceEverOn(true);
+    tfp_ = new VerilatedVcdC;
+    top->trace(tfp_, depth);
+    tfp_->open(vcd_path.c_str());
+    if (!tfp_->isOpen()) {
+        std::cerr << "[Trace] 无法打开 VCD 文件: " << vcd_path << std::endl;
+        delete tfp_;
+        tfp_ = nullptr;
+    } else {
+        // 文件已就绪，等待 trace_start() 才开始写入
+        std::cout << "[Trace] 波形就绪（暂停）：" << vcd_path
+                  << "  输入 'wave start' 开始录制" << std::endl;
+    }
+}
+
+void Core::close_trace() {
+    trace_enabled_ = false;
+    if (tfp_) {
+        tfp_->close();
+        delete tfp_;
+        tfp_ = nullptr;
+    }
+}
+
+void Core::trace_start() noexcept {
+    if (!tfp_) {
+        std::cerr << "[Trace] 请先与 --wave 参数指定 VCD 路径再开启录制" << std::endl;
+        return;
+    }
+    trace_enabled_ = true;
+    std::cout << "[Trace] 录制开始 (t=" << contextp->time() << ")" << std::endl;
+}
+
+void Core::trace_stop() noexcept {
+    if (trace_enabled_) {
+        trace_enabled_ = false;
+        // 主动 flush，确保当前波形段落落盘
+        if (tfp_) tfp_->flush();
+        std::cout << "[Trace] 录制暂停 (t=" << contextp->time() << ")" << std::endl;
+    }
+}
+
+bool Core::is_tracing() const noexcept {
+    return tfp_ != nullptr && trace_enabled_;
 }
 
 void Core::eval() {
     top->eval();
+    // 双重检查：只有文件就绪且录制开关为开时才写入
+    if (tfp_ && trace_enabled_) tfp_->dump(contextp->time());
     contextp->timeInc(1);
 }
 

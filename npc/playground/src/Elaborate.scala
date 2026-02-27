@@ -13,7 +13,6 @@ object Elaborate extends App {
   )
 
   implicit val config: CoreConfig = CoreConfig(
-    isSingleCycle = true,
     hasM = true,
     fastMdu = true,
     hasZicsr = true

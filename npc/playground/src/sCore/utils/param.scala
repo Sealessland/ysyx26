@@ -27,7 +27,8 @@ case class CoreConfig(
   hasA: Boolean = false,       // 是否支持原子指令扩展 (A extension)
   hasZicsr: Boolean = true,    // 是否支持 CSR 指令
   fastMdu: Boolean = true,     // 是否使用单周期组合逻辑乘除法单元
-  isSingleCycle: Boolean = true, // 是否为单周期设计 (验证用)
+  isSingleCycle: Boolean = false, // 是否为单周期设计 (验证用)
+  isMultiCycle: Boolean = true,   // 是否为严格握手的多周期设计 (只有一条指令流动)
   frontend: FrontendConfig = FrontendConfig(),
   lsu: LsuConfig = LsuConfig()
 ) {
@@ -54,6 +55,7 @@ trait HasCoreParams {
   val hasZicsr      = p.hasZicsr
   val fastMdu       = p.fastMdu
   val isSingleCycle = p.isSingleCycle
+  val isMultiCycle  = p.isMultiCycle
   
   // 衍生参数计算，一处定义，到处使用
   val instBytes = if (p.hasRVC) 2 else 4

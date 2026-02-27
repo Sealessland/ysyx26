@@ -940,47 +940,49 @@ int main(int argc, char **argv) {
         break;
       }
 
-      const auto &exp = expected[idx];
-      if (pc != exp.pc) {
-        std::fprintf(stderr,
-                     "PC mismatch at commit %zu: got 0x%08x expected 0x%08x\n",
-                     idx, pc, exp.pc);
-        std::fprintf(stderr, "Actual instruction:\n");
-        print_inst_debug(pc, inst_at_pc(pc));
-        std::fprintf(stderr, "Expected instruction:\n");
-        print_inst_debug(exp.pc, inst_at_pc(exp.pc));
-        errors++;
-        break;
-      }
-      if (wen != exp.wen) {
-        std::fprintf(stderr,
-                     "WEN mismatch at pc=0x%08x: got %u expected %u\n", pc,
-                     static_cast<uint32_t>(wen), static_cast<uint32_t>(exp.wen));
-        std::fprintf(stderr, "Instruction:\n");
-        print_inst_debug(pc, inst_at_pc(pc));
-        errors++;
-      }
-      if (exp.wen) {
-        if (top->io_commit_rd != exp.rd) {
+      if (top->io_commit_valid) {
+        const auto &exp = expected[idx];
+        if (pc != exp.pc) {
           std::fprintf(stderr,
-                       "RD mismatch at pc=0x%08x: got %u expected %u\n", pc,
-                       top->io_commit_rd, exp.rd);
+                       "PC mismatch at commit %zu: got 0x%08x expected 0x%08x\n",
+                       idx, pc, exp.pc);
+          std::fprintf(stderr, "Actual instruction:\n");
+          print_inst_debug(pc, inst_at_pc(pc));
+          std::fprintf(stderr, "Expected instruction:\n");
+          print_inst_debug(exp.pc, inst_at_pc(exp.pc));
+          errors++;
+          break;
+        }
+        if (wen != exp.wen) {
+          std::fprintf(stderr,
+                       "WEN mismatch at pc=0x%08x: got %u expected %u\n", pc,
+                       static_cast<uint32_t>(wen), static_cast<uint32_t>(exp.wen));
           std::fprintf(stderr, "Instruction:\n");
           print_inst_debug(pc, inst_at_pc(pc));
           errors++;
         }
-        if (top->io_commit_wdata != exp.wdata) {
-          std::fprintf(stderr,
-                       "WDATA mismatch at pc=0x%08x: got 0x%08x expected 0x%08x\n",
-                       pc, top->io_commit_wdata, exp.wdata);
-          std::fprintf(stderr, "Instruction:\n");
-          print_inst_debug(pc, inst_at_pc(pc));
-          errors++;
+        if (exp.wen) {
+          if (top->io_commit_rd != exp.rd) {
+            std::fprintf(stderr,
+                         "RD mismatch at pc=0x%08x: got %u expected %u\n", pc,
+                         top->io_commit_rd, exp.rd);
+            std::fprintf(stderr, "Instruction:\n");
+            print_inst_debug(pc, inst_at_pc(pc));
+            errors++;
+          }
+          if (top->io_commit_wdata != exp.wdata) {
+            std::fprintf(stderr,
+                         "WDATA mismatch at pc=0x%08x: got 0x%08x expected 0x%08x\n",
+                         pc, top->io_commit_wdata, exp.wdata);
+            std::fprintf(stderr, "Instruction:\n");
+            print_inst_debug(pc, inst_at_pc(pc));
+            errors++;
+          }
         }
+        idx++;
       }
 
       eval_high(top.get(), &ctx, tfp_ptr);
-      idx++;
       if (g_ebreak_called) {
         break;
       }
@@ -1034,10 +1036,13 @@ int main(int argc, char **argv) {
         continue;
       }
     }
-    active_cycles++;
-    last_pc = pc;
-    if (top->io_commit_wen != 0) {
-      write_commits++;
+
+    if (top->io_commit_valid) {
+      active_cycles++;
+      last_pc = pc;
+      if (top->io_commit_wen != 0) {
+        write_commits++;
+      }
     }
 
     eval_high(top.get(), &ctx, tfp_ptr);

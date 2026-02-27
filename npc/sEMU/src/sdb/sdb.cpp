@@ -374,15 +374,38 @@ void SDB::cmd_trace_func(const std::vector<std::string>& args) {
     g_trace_mem = false;
 }
 
+void SDB::cmd_wave(const std::vector<std::string>& args) {
+    if (args.empty() || args[0] == "status") {
+        if (core->is_tracing()) {
+            std::cout << ANSI_COLOR_GREEN << "[Wave] 正在录制中" << ANSI_COLOR_RESET << std::endl;
+        } else {
+            std::cout << ANSI_COLOR_YELLOW << "[Wave] 暂停（文件已就绪: " 
+                      << (core->is_tracing() ? "是" : "不确定") << "）" << ANSI_COLOR_RESET << std::endl;
+        }
+        return;
+    }
+    if (args[0] == "start") {
+        core->trace_start();
+    } else if (args[0] == "stop") {
+        core->trace_stop();
+    } else {
+        std::cout << "Usage: wave [start|stop|status]\n"
+                  << "  start  - 开始向 VCD 文件写入波形\n"
+                  << "  stop   - 暂停录制（保留文件，可再次 start）\n"
+                  << "  status - 显示当前录制状态\n";
+    }
+}
+
 void SDB::cmd_help(const std::vector<std::string>& args) {
     (void)args;
-    std::cout << "help - Print help information\n"
-              << "c - Continue running\n"
-              << "q - Quit NEMU\n"
-              << "si [N] [mode] - Single step N instructions with optional mode ['bare', 'trace', 'diff'] (default: bare)\n"
-              << "trace-func FUNC_NAME - Auto trace when entering and exiting specific function\n"
-              << "info SUBCMD - info r (registers), info w (watchpoints), info func FUNC_NAME (get function address)\n"
-              << "x N EXPR - Examine memory\n";
+    std::cout << "help                       - 打印帮助信息\n"
+              << "c                          - 继续运行\n"
+              << "q                          - 退出\n"
+              << "si [N] [mode]              - 单步 N 条指令，mode: bare/trace/diff\n"
+              << "trace-func FUNC_NAME       - 对指定函数段自动扫描\n"
+              << "info r|w|func FUNC_NAME    - 查看寄存器/监控点/函数地址\n"
+              << "x N EXPR                   - 内存内容查看\n"
+              << "wave start|stop|status     - VCD 波形录制控制（需 --wave 启动）\n";
 }
 
 void SDB::sdb_mainloop() {
@@ -405,6 +428,7 @@ void SDB::sdb_mainloop() {
             else if (cmd == "info") cmd_info(args);
             else if (cmd == "x") cmd_x(args);
             else if (cmd == "trace-func") cmd_trace_func(args);
+            else if (cmd == "wave") cmd_wave(args);
             else if (cmd == "help") cmd_help(args);
             else std::cout << "Unknown command: " << cmd << std::endl;
         }

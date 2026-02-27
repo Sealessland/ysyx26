@@ -16,7 +16,7 @@
 struct sEMU_Options {
     std::string bin_file;
     std::string elf_file;
-    // 未来可以扩展更多的参数，比如 --memory-size, --base-addr 等
+    std::string wave_file; ///< VCD 输出路径，空则不投一波形
 };
 
 sEMU_Options parse_args(int argc, char* argv[]) {
@@ -25,21 +25,27 @@ sEMU_Options parse_args(int argc, char* argv[]) {
     const struct option table[] = {
         {"bin" , required_argument, NULL, 'b'},
         {"elf" , required_argument, NULL, 'e'},
+        {"wave", optional_argument, NULL, 'w'},
         {"help", no_argument,       NULL, 'h'},
         {0     , 0,                 NULL,  0 }
     };
 
     int o;
-    while ((o = getopt_long(argc, argv, "-hb:e:", table, NULL)) != -1) {
+    while ((o = getopt_long(argc, argv, "-hb:e:w::", table, NULL)) != -1) {
         switch (o) {
             case 'b': opt.bin_file = optarg; break;
             case 'e': opt.elf_file = optarg; break;
+            case 'w':
+                // --wave 无参数时默认输出 sim.vcd
+                opt.wave_file = (optarg && optarg[0]) ? optarg : "sim.vcd";
+                break;
             case 'h':
                 std::cout << "Usage: " << argv[0] << " [options] [image.bin]\n"
                           << "Options:\n"
-                          << "  -b, --bin <file>   Load binary image.\n"
-                          << "  -e, --elf <file>   Load ELF image and parse symbols.\n"
-                          << "  -h, --help         Show this help message.\n";
+                          << "  -b, --bin <file>      Load binary image.\n"
+                          << "  -e, --elf <file>      Load ELF image and parse symbols.\n"
+                          << "  -w, --wave [file]     Dump VCD waveform (default: sim.vcd).\n"
+                          << "  -h, --help            Show this help message.\n";
                 exit(0);
             case 1: 
                 if (opt.bin_file.empty() && opt.elf_file.empty()) {
@@ -111,8 +117,9 @@ int main(int argc, char* argv[]) {
 #endif
     }
 
-    // 初始化处理器核心，并传入内存指针以供 DPI-C 操作
-    Core core(&mem);
+    // 初始化处理器核心，传入内存指针和可选的 VCD 波形路径
+    // vcd_path 非空时，Core 内部会在首次 eval 前启用 traceEverOn（Verilator 硬性要求）
+    Core core(&mem, options.wave_file);
 
     // 进行简单的系统复位
     core.reset(5);
