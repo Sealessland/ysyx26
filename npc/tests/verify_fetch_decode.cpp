@@ -24,6 +24,12 @@ constexpr uint32_t kCsrMcause = 0x342;
 
 std::vector<uint8_t> g_mem(kDefaultMemSize, 0);
 bool g_ebreak_called = false;
+size_t g_paddr_read_count = 0;
+size_t g_pmem_read_count = 0;
+size_t g_pmem_write_count = 0;
+size_t g_pmem_oob_count = 0;
+size_t g_pmem_len_error = 0;
+size_t g_paddr_oob_count = 0;
 
 inline bool addr_in_range(uint32_t addr) {
   return addr >= kBase && (addr - kBase) < g_mem.size();
@@ -799,22 +805,59 @@ void eval_high(VCoreTop *top, VerilatedContext *ctx, VerilatedVcdC *tfp) {
   if (tfp) tfp->dump(ctx->time());
   ctx->timeInc(1);
 }
+
+bool check_bus_activity(bool require_fetch, bool print_stats) {
+  if (print_stats) {
+    std::fprintf(stderr,
+                 "BUS: fetch=%zu load=%zu store=%zu oob_paddr=%zu oob_pmem=%zu len_err=%zu\n",
+                 g_paddr_read_count, g_pmem_read_count, g_pmem_write_count,
+                 g_paddr_oob_count, g_pmem_oob_count, g_pmem_len_error);
+  }
+  if (require_fetch && g_paddr_read_count == 0) {
+    std::fprintf(stderr, "No instruction fetch activity observed.\n");
+    return false;
+  }
+  if (g_paddr_oob_count != 0 || g_pmem_oob_count != 0 || g_pmem_len_error != 0) {
+    std::fprintf(stderr, "Bus activity contains out-of-range or invalid length accesses.\n");
+    return false;
+  }
+  return true;
+}
 } // namespace
 
 extern "C" int paddr_read(int raddr) {
+  g_paddr_read_count++;
   uint32_t addr = static_cast<uint32_t>(raddr);
   if (!addr_in_range(addr) || !addr_in_range(addr + 3)) {
+    g_paddr_oob_count++;
     return 0;
   }
   return static_cast<int>(mem_read32_aligned(addr));
 }
 
-extern "C" long long pmem_read(long long raddr, unsigned char /*len*/) {
+extern "C" long long pmem_read(long long raddr, unsigned char len) {
+  g_pmem_read_count++;
+  if (!(len == 1 || len == 2 || len == 4 || len == 8)) {
+    g_pmem_len_error++;
+  }
   uint32_t addr = static_cast<uint32_t>(raddr);
+  if (!addr_in_range(addr) || !addr_in_range(addr + (len ? len - 1 : 0))) {
+    g_pmem_oob_count++;
+    return 0;
+  }
   return static_cast<long long>(mem_read32_aligned(addr));
 }
 
 extern "C" void pmem_write(long long waddr, long long wdata, unsigned char len) {
+  g_pmem_write_count++;
+  if (!(len == 1 || len == 2 || len == 4 || len == 8)) {
+    g_pmem_len_error++;
+  }
+  uint32_t addr = static_cast<uint32_t>(waddr);
+  if (!addr_in_range(addr) || !addr_in_range(addr + (len ? len - 1 : 0))) {
+    g_pmem_oob_count++;
+    return;
+  }
   mem_write(static_cast<uint32_t>(waddr), static_cast<uint64_t>(wdata), len);
 }
 
@@ -908,6 +951,12 @@ int main(int argc, char **argv) {
   top->reset = 0;
 
   g_ebreak_called = false;
+  g_paddr_read_count = 0;
+  g_pmem_read_count = 0;
+  g_pmem_write_count = 0;
+  g_pmem_oob_count = 0;
+  g_pmem_len_error = 0;
+  g_paddr_oob_count = 0;
 
   if (!use_binary) {
     auto inst_at_pc = [&](uint32_t pc) -> uint32_t {
@@ -1012,6 +1061,9 @@ int main(int argc, char **argv) {
       std::fprintf(stderr, "Verification failed with %d errors.\n", errors);
       return 1;
     }
+    if (!check_bus_activity(true, true)) {
+      return 1;
+    }
 
     std::printf("PASS: %zu instructions committed. Waveform: build/verilator/wave.vcd\n",
                 expected.size());
@@ -1068,6 +1120,9 @@ int main(int argc, char **argv) {
 
   if (require_ebreak && !g_ebreak_called) {
     std::fprintf(stderr, "Ebreak was not observed.\n");
+    return 1;
+  }
+  if (!check_bus_activity(true, true)) {
     return 1;
   }
   return 0;
